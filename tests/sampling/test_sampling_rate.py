@@ -8,7 +8,8 @@ from tests.sampling.sampling_utils import get_supported_sampling_rates
     [
         ("1.7.6", [256]),
         ("2.1.2", [256]),
-        ("2.3.5", [128]),
+        ("2.2.4", [256]),
+        ("2.2.6", [256]),
         ("2.3.5", [128]),
         ("2.4.6", [128,256])
     ]
