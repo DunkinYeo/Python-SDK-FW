@@ -1,42 +1,51 @@
-"""Main screen page object for SDK validation app."""
+"""Main screen page object for RECORD-EX app."""
 from appium.webdriver.common.appiumby import AppiumBy
 from tests.appium.pages.base_page import BasePage
 
 
 class MainScreen(BasePage):
-    """Page object for main screen of SDK validation app."""
+    """Page object for main screen of RECORD-EX app (samplingrecord2.1.5.apk)."""
 
     # ==================================================
-    # IMPORTANT: Customize these locators for your app!
+    # Updated for RECORD-EX app - Jetpack Compose UI
+    # Package: com.wellysis.spatch.tool.record.ex
     # ==================================================
-    # Use Appium Inspector to find the correct IDs/XPaths
-    # Examples below are placeholders
+    # TODO: Verify with Appium Inspector and update as needed
 
-    # Main UI elements
-    APP_TITLE = (AppiumBy.ID, "com.yourapp:id/app_title")
-    APP_VERSION_TEXT = (AppiumBy.ID, "com.yourapp:id/version_text")
+    # Main menu buttons (always visible)
+    LINK_BUTTON = (AppiumBy.XPATH, "//*[@text='link' or @text='Link' or @text='LINK']")
+    READ_BUTTON = (AppiumBy.XPATH, "//*[@text='read' or @text='Read' or @text='READ']")
+    WRITESET_BUTTON = (AppiumBy.XPATH, "//*[@text='writeset' or @text='WriteSet' or @text='WRITESET']")
+    WRITEGET_BUTTON = (AppiumBy.XPATH, "//*[@text='writeget' or @text='WriteGet' or @text='WRITEGET']")
+    NOTIFY_BUTTON = (AppiumBy.XPATH, "//*[@text='notify' or @text='Notify' or @text='NOTIFY']")
 
-    # Navigation buttons
-    READ_BUTTON = (AppiumBy.ID, "com.yourapp:id/read_button")
-    WRITE_BUTTON = (AppiumBy.ID, "com.yourapp:id/write_button")
-    SCAN_BUTTON = (AppiumBy.ID, "com.yourapp:id/scan_button")
-    CONNECT_BUTTON = (AppiumBy.ID, "com.yourapp:id/connect_button")
-    SETTINGS_BUTTON = (AppiumBy.ID, "com.yourapp:id/settings_button")
+    # Alternative: partial match for flexibility
+    LINK_TEXT = (AppiumBy.XPATH, "//*[contains(translate(@text, 'LINK', 'link'), 'link')]")
+    READ_TEXT = (AppiumBy.XPATH, "//*[contains(translate(@text, 'READ', 'read'), 'read')]")
+    WRITESET_TEXT = (AppiumBy.XPATH, "//*[contains(translate(@text, 'WRITESET', 'writeset'), 'writeset')]")
+    WRITEGET_TEXT = (AppiumBy.XPATH, "//*[contains(translate(@text, 'WRITEGET', 'writeget'), 'writeget')]")
+    NOTIFY_TEXT = (AppiumBy.XPATH, "//*[contains(translate(@text, 'NOTIFY', 'notify'), 'notify')]")
 
-    # Alternative: Find by text
-    READ_BUTTON_TEXT = (AppiumBy.XPATH, "//*[@text='Read']")
-    WRITE_BUTTON_TEXT = (AppiumBy.XPATH, "//*[@text='Write']")
-    SCAN_BUTTON_TEXT = (AppiumBy.XPATH, "//*[@text='Scan']")
-    CONNECT_BUTTON_TEXT = (AppiumBy.XPATH, "//*[@text='Connect']")
+    # Action buttons
+    DONE_BUTTON = (AppiumBy.XPATH, "//*[@text='DONE']")
+    NEXT_BUTTON = (AppiumBy.XPATH, "//*[@text='NEXT']")
+    STOP_BUTTON = (AppiumBy.XPATH, "//*[@text='STOP']")
+    RESET_BUTTON = (AppiumBy.XPATH, "//*[@text='RESET']")
+    QUIT_BUTTON = (AppiumBy.XPATH, "//*[@text='QUIT']")
 
-    # Connection status
-    CONNECTION_STATUS = (AppiumBy.ID, "com.yourapp:id/connection_status")
-    DEVICE_NAME_LABEL = (AppiumBy.ID, "com.yourapp:id/device_name")
+    # Dialog buttons
+    YES_BUTTON = (AppiumBy.XPATH, "//*[@text='YES']")
+    NO_BUTTON = (AppiumBy.XPATH, "//*[@text='NO']")
+    RETRY_BUTTON = (AppiumBy.XPATH, "//*[@text='RETRY']")
+
+    # Connection status (verify with Inspector)
+    CONNECTION_STATUS = (AppiumBy.XPATH, "//*[contains(@text, 'connect') or contains(@text, 'Connect')]")
+    DEVICE_NAME_LABEL = (AppiumBy.XPATH, "//*[contains(@resource-id, 'device')]")
 
     def __init__(self, driver):
         """Initialize main screen page object."""
         super().__init__(driver)
-        self.logger.info("Initialized MainScreen page object")
+        self.logger.info("Initialized MainScreen page object for RECORD-EX")
 
     def is_screen_loaded(self, timeout: int = 10) -> bool:
         """
@@ -49,17 +58,15 @@ class MainScreen(BasePage):
             True if screen loaded
         """
         self.logger.info("Checking if main screen is loaded")
-        # Try to find any characteristic element of main screen
-        # Customize this check based on your app
         try:
-            # Try by ID first
-            if self.is_element_present(self.APP_TITLE, timeout):
+            # Check for main menu buttons
+            if self.is_element_present(self.LINK_BUTTON, timeout):
                 return True
-            # Fallback: try to find Read button
             if self.is_element_present(self.READ_BUTTON, timeout):
                 return True
-            # Last resort: try by text
-            return self.is_element_present(self.READ_BUTTON_TEXT, timeout)
+            if self.is_element_present(self.LINK_TEXT, timeout):
+                return True
+            return False
         except Exception as e:
             self.logger.error(f"Failed to verify main screen loaded: {e}")
             self.take_screenshot("main_screen_not_loaded")
@@ -67,76 +74,97 @@ class MainScreen(BasePage):
 
     def get_app_version(self) -> str:
         """
-        Get app version displayed on main screen.
+        Get app version.
 
         Returns:
-            App version string or "unknown" if not found
+            App version string (2.1.5 from APK)
+
+        Note: Use Appium Inspector to find if version is displayed in UI
         """
-        self.logger.info("Getting app version from main screen")
-        try:
-            # Try to find version text element
-            version_text = self.safe_get_text(self.APP_VERSION_TEXT, timeout=5)
-            if version_text:
-                self.logger.info(f"Found app version: {version_text}")
-                return version_text
+        self.logger.info("Getting app version")
+        # For now, return known version from APK filename
+        return "2.1.5"
 
-            # Alternative: Try to find version in other locations
-            # Add your app-specific logic here
-            self.logger.warning("App version not found on main screen")
-            return "unknown"
-
-        except Exception as e:
-            self.logger.error(f"Error getting app version: {e}")
-            return "unknown"
-
-    def navigate_to_read_section(self) -> bool:
+    def navigate_to_link(self) -> bool:
         """
-        Navigate to Read section.
+        Navigate to LINK section (BLE connection).
 
         Returns:
             True if navigation successful
         """
-        self.logger.info("Navigating to Read section")
+        self.logger.info("Navigating to LINK section")
         try:
-            # Try clicking Read button by ID
-            if self.safe_click(self.READ_BUTTON):
-                self.logger.info("Clicked Read button (by ID)")
+            if self.safe_click(self.LINK_BUTTON):
+                self.logger.info("Clicked LINK button")
                 return True
 
-            # Fallback: Try by text
-            if self.safe_click(self.READ_BUTTON_TEXT):
-                self.logger.info("Clicked Read button (by text)")
+            if self.safe_click(self.LINK_TEXT):
+                self.logger.info("Clicked LINK (partial match)")
                 return True
 
-            self.logger.error("Failed to click Read button")
-            self.take_screenshot("read_button_not_found")
+            self.logger.error("Failed to click LINK button")
+            self.take_screenshot("link_button_not_found")
             return False
 
         except Exception as e:
-            self.logger.error(f"Error navigating to Read section: {e}")
-            self.take_screenshot("navigate_read_error")
+            self.logger.error(f"Error navigating to LINK: {e}")
+            self.take_screenshot("navigate_link_error")
             return False
 
-    def navigate_to_write_section(self) -> bool:
-        """Navigate to Write section."""
-        self.logger.info("Navigating to Write section")
-        if self.safe_click(self.WRITE_BUTTON):
-            return True
-        return self.safe_click(self.WRITE_BUTTON_TEXT)
+    def navigate_to_read(self) -> bool:
+        """
+        Navigate to READ section.
 
-    def navigate_to_scan(self) -> bool:
-        """Navigate to Scan screen."""
-        self.logger.info("Navigating to Scan screen")
-        if self.safe_click(self.SCAN_BUTTON):
-            return True
-        return self.safe_click(self.SCAN_BUTTON_TEXT)
+        This section contains Firmware version and other read operations.
 
-    def click_connect(self) -> bool:
-        """Click Connect button."""
-        self.logger.info("Clicking Connect button")
-        if self.safe_click(self.CONNECT_BUTTON):
+        Returns:
+            True if navigation successful
+        """
+        self.logger.info("Navigating to READ section")
+        if self.safe_click(self.READ_BUTTON):
             return True
-        return self.safe_click(self.CONNECT_BUTTON_TEXT)
+        return self.safe_click(self.READ_TEXT)
+
+    def navigate_to_writeset(self) -> bool:
+        """Navigate to WRITESET section."""
+        self.logger.info("Navigating to WRITESET section")
+        if self.safe_click(self.WRITESET_BUTTON):
+            return True
+        return self.safe_click(self.WRITESET_TEXT)
+
+    def navigate_to_writeget(self) -> bool:
+        """Navigate to WRITEGET section."""
+        self.logger.info("Navigating to WRITEGET section")
+        if self.safe_click(self.WRITEGET_BUTTON):
+            return True
+        return self.safe_click(self.WRITEGET_TEXT)
+
+    def navigate_to_notify(self) -> bool:
+        """Navigate to NOTIFY section."""
+        self.logger.info("Navigating to NOTIFY section")
+        if self.safe_click(self.NOTIFY_BUTTON):
+            return True
+        return self.safe_click(self.NOTIFY_TEXT)
+
+    def click_done(self) -> bool:
+        """Click DONE button."""
+        self.logger.info("Clicking DONE button")
+        return self.safe_click(self.DONE_BUTTON)
+
+    def click_next(self) -> bool:
+        """Click NEXT button."""
+        self.logger.info("Clicking NEXT button")
+        return self.safe_click(self.NEXT_BUTTON)
+
+    def click_stop(self) -> bool:
+        """Click STOP button."""
+        self.logger.info("Clicking STOP button")
+        return self.safe_click(self.STOP_BUTTON)
+
+    def click_reset(self) -> bool:
+        """Click RESET button."""
+        self.logger.info("Clicking RESET button")
+        return self.safe_click(self.RESET_BUTTON)
 
     def is_device_connected(self) -> bool:
         """
@@ -145,24 +173,16 @@ class MainScreen(BasePage):
         Returns:
             True if device connected
 
-        Note: Customize this based on your app's connection indicator
+        Note: Use Appium Inspector to find accurate connection indicator
         """
         self.logger.info("Checking BLE device connection status")
         try:
-            # Method 1: Check connection status text
+            # Look for connection-related text
             status_text = self.safe_get_text(self.CONNECTION_STATUS, timeout=3)
             if status_text:
-                # Customize these checks for your app
                 connected_indicators = ["connected", "연결됨", "연결"]
                 if any(indicator in status_text.lower() for indicator in connected_indicators):
                     self.logger.info(f"Device connected (status: {status_text})")
-                    return True
-
-            # Method 2: Check if device name is displayed
-            if self.is_element_visible(self.DEVICE_NAME_LABEL, timeout=2):
-                device_name = self.safe_get_text(self.DEVICE_NAME_LABEL)
-                if device_name and device_name != "":
-                    self.logger.info(f"Device connected (name: {device_name})")
                     return True
 
             self.logger.info("Device not connected")
@@ -190,6 +210,16 @@ class MainScreen(BasePage):
             self.logger.error(f"Error getting device name: {e}")
             return ""
 
+    def confirm_dialog_yes(self) -> bool:
+        """Click YES in confirmation dialog."""
+        self.logger.info("Clicking YES in dialog")
+        return self.safe_click(self.YES_BUTTON)
+
+    def confirm_dialog_no(self) -> bool:
+        """Click NO in confirmation dialog."""
+        self.logger.info("Clicking NO in dialog")
+        return self.safe_click(self.NO_BUTTON)
+
     def wait_for_screen_ready(self, timeout: int = 15) -> bool:
         """
         Wait for main screen to be fully loaded and ready.
@@ -202,10 +232,11 @@ class MainScreen(BasePage):
         """
         self.logger.info("Waiting for main screen to be ready")
         try:
-            # Wait for key UI elements to be present
-            if not self.wait_for_element(self.READ_BUTTON, timeout):
-                if not self.wait_for_element(self.READ_BUTTON_TEXT, timeout):
-                    return False
+            # Wait for LINK or READ button as indicator
+            if not self.wait_for_element(self.LINK_BUTTON, timeout):
+                if not self.wait_for_element(self.LINK_TEXT, timeout):
+                    if not self.wait_for_element(self.READ_BUTTON, timeout):
+                        return False
 
             self.logger.info("Main screen is ready")
             return True

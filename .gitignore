@@ -38,3 +38,4 @@ appium.log
 # OS
 .DS_Store
 Thumbs.db
+apk-analysis/

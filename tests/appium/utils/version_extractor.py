@@ -26,19 +26,21 @@ class VersionExtractor:
         """
         Extract firmware version from app.
 
-        Flow:
-        1. Navigate to Read screen
+        Flow for RECORD-EX app:
+        1. Navigate to READ menu
         2. Select "Firmware version" option
         3. Read displayed version
+
+        Note: Requires BLE device to be connected first
 
         Returns:
             Firmware version string or "unknown" if extraction fails
         """
         self.logger.info("Extracting firmware version")
         try:
-            # Navigate to Read section from main screen
-            if not self.main_screen.navigate_to_read_section():
-                self.logger.error("Failed to navigate to Read section")
+            # Navigate to READ section from main screen
+            if not self.main_screen.navigate_to_read():
+                self.logger.error("Failed to navigate to READ section")
                 return "unknown"
 
             # Wait for Read screen to load
