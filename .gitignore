@@ -18,10 +18,12 @@ htmlcov/
 test-results/
 test-report.html
 test-results.json
+.report.json
 versions.json
 slack-payload.json
 *.xml
 screenshots/
+*.png
 appium.log
 
 # Environment

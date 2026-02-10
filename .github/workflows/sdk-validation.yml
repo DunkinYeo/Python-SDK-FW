@@ -1,0 +1,158 @@
+name: SDK 검증 자동화 테스트
+
+on:
+  # Manual trigger - 수동 실행
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: '실행할 테스트 스위트'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - read_only
+          - writeget_only
+          - notify_only
+
+  # Schedule - 매일 오전 9시 (KST)
+  schedule:
+    - cron: '0 0 * * *'  # UTC 00:00 = KST 09:00
+
+  # Push to main - main 브랜치에 push될 때
+  push:
+    branches:
+      - main
+    paths:
+      - 'tests/**'
+      - 'scripts/**'
+      - '.github/workflows/sdk-validation.yml'
+
+jobs:
+  test:
+    name: SDK 검증 테스트
+    runs-on: self-hosted  # Self-hosted runner 사용 (실제 디바이스 필요)
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔍 Check Android device
+        run: |
+          echo "Checking for connected Android devices..."
+          adb devices
+          adb shell getprop ro.build.version.release
+
+      - name: 🔍 Check Appium server
+        run: |
+          echo "Checking if Appium server is running..."
+          curl -s http://localhost:4723/status || echo "⚠️  Appium server may not be running"
+
+      - name: 🧪 Run regression tests
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          APPIUM_SERVER_URL: http://localhost:4723/wd/hub
+          APPIUM_DEVICE_NAME: ${{ secrets.DEVICE_ID || '55ETQWBXYE1RA1' }}
+          BLE_DEVICE_SERIAL: ${{ secrets.BLE_DEVICE_SERIAL }}
+        run: |
+          # Stop app first
+          adb shell am force-stop com.wellysis.spatch.sdk.sample || true
+          sleep 2
+
+          # Determine which tests to run
+          TEST_PATH="tests/regression/test_regression.py"
+          if [ "${{ github.event.inputs.test_suite }}" = "read_only" ]; then
+            TEST_PATH="tests/regression/test_regression.py::TestReadScreen"
+          elif [ "${{ github.event.inputs.test_suite }}" = "writeget_only" ]; then
+            TEST_PATH="tests/regression/test_regression.py::TestWriteGetScreen"
+          elif [ "${{ github.event.inputs.test_suite }}" = "notify_only" ]; then
+            TEST_PATH="tests/regression/test_regression.py::TestNotifyScreen"
+          fi
+
+          # Run tests
+          python -m pytest $TEST_PATH \
+            -v \
+            --html=test-report.html \
+            --self-contained-html \
+            --json-report \
+            --json-report-file=.report.json \
+            --tb=short \
+            || true  # Don't fail workflow on test failure
+
+      - name: 📊 Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ github.run_number }}
+          path: |
+            test-report.html
+            .report.json
+            *.png
+          retention-days: 30
+
+      - name: 📤 Send Slack notification
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            python scripts/send_slack_notification.py || echo "⚠️  Failed to send Slack notification"
+          else
+            echo "⚠️  SLACK_WEBHOOK_URL secret not configured"
+          fi
+
+      - name: 📈 Generate test summary
+        if: always()
+        run: |
+          echo "## 📊 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f .report.json ]; then
+            python -c "
+import json
+with open('.report.json') as f:
+    report = json.load(f)
+    summary = report.get('summary', {})
+    total = summary.get('total', 0)
+    passed = summary.get('passed', 0)
+    failed = summary.get('failed', 0)
+    duration = report.get('duration', 0)
+
+    print(f'**Total Tests:** {total}')
+    print(f'**✅ Passed:** {passed}')
+    print(f'**❌ Failed:** {failed}')
+    print(f'**⏱️  Duration:** {duration:.1f}s')
+    print(f'**📊 Pass Rate:** {passed/total*100:.1f}%' if total > 0 else '**📊 Pass Rate:** N/A')
+            " >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: ❌ Fail if tests failed
+        if: always()
+        run: |
+          if [ -f .report.json ]; then
+            python -c "
+import json, sys
+with open('.report.json') as f:
+    report = json.load(f)
+    failed = report.get('summary', {}).get('failed', 0)
+    if failed > 0:
+        print(f'❌ {failed} test(s) failed')
+        sys.exit(1)
+    else:
+        print('✅ All tests passed')
+            "
+          fi
