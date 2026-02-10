@@ -1,2 +1,40 @@
 notebooks/*_recorded.txt
-notebooks/*_recorded.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test-results/
+test-report.html
+test-results.json
+versions.json
+slack-payload.json
+*.xml
+screenshots/
+appium.log
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
