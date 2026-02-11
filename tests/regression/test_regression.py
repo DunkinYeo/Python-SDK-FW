@@ -519,7 +519,7 @@ class TestReadScreen:
 
 
 class TestDataCollectionWorkflow:
-    """Test complete data collection workflow: WriteSet Start/Pause/Restart → WriteGet ECG FULL → Notify → WriteSet Stop"""
+    """Test complete data collection workflow: WriteSet Start/Pause/Restart → Notify → WriteSet Stop/Reset"""
 
     def test_data_collection_workflow(self, connected_driver):
         """
@@ -531,6 +531,7 @@ class TestDataCollectionWorkflow:
         3. WriteSet: Restart → Resume measurement
         4. Notify: Verify all data streams are active
         5. WriteSet: Stop → Stop measurement
+        6. WriteSet: Reset Device → Clean up
         """
         print("\n" + "="*80)
         print("🔬 TEST: Complete Data Collection Workflow")
@@ -627,19 +628,26 @@ class TestDataCollectionWorkflow:
                 print(f"✅ Found: {element_name}")
                 found_elements.append(element_name)
             except:
-                # Try scrolling down to find the element
+                # Try scrolling down multiple times to find the element
                 print(f"📜 Scrolling to find: {element_name}...")
-                try:
-                    driver.execute_script('mobile: scrollGesture', {
-                        'left': 100, 'top': 800, 'width': 500, 'height': 1000,
-                        'direction': 'down',
-                        'percent': 2.0
-                    })
-                    time.sleep(1)
-                    element = driver.find_element(AppiumBy.XPATH, f"//*[@text='{element_name}']")
-                    print(f"✅ Found after scroll: {element_name}")
-                    found_elements.append(element_name)
-                except:
+                found = False
+                for scroll_attempt in range(3):  # Try up to 3 scroll attempts
+                    try:
+                        driver.execute_script('mobile: scrollGesture', {
+                            'left': 100, 'top': 800, 'width': 500, 'height': 1000,
+                            'direction': 'down',
+                            'percent': 2.0
+                        })
+                        time.sleep(1)
+                        element = driver.find_element(AppiumBy.XPATH, f"//*[@text='{element_name}']")
+                        print(f"✅ Found after scroll (attempt {scroll_attempt + 1}): {element_name}")
+                        found_elements.append(element_name)
+                        found = True
+                        break
+                    except:
+                        continue
+
+                if not found:
                     print(f"❌ Missing: {element_name}")
 
         print(f"\n📊 Result: {len(found_elements)}/{len(expected_elements)} elements found")
@@ -678,6 +686,23 @@ class TestDataCollectionWorkflow:
 
         driver.save_screenshot('step5_writeset_stop.png')
         print("✅ STEP 5 Complete - Measurement Stopped")
+
+        # =================================================================
+        # STEP 6: Reset Device
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 6: Reset Device")
+        print("="*80)
+
+        print("\n🔄 Clicking RESET DEVICE button...")
+        reset_button = driver.find_element(AppiumBy.XPATH, "//*[@text='RESET DEVICE']")
+        reset_button.click()
+
+        print("⏳ Waiting for device reset (5 seconds)...")
+        time.sleep(5)
+
+        driver.save_screenshot('step6_reset_device.png')
+        print("✅ STEP 6 Complete - Device Reset")
 
         # =================================================================
         # Final Verification

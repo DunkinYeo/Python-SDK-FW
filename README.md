@@ -128,6 +128,7 @@ appium &
 4. **Notify**: 모든 데이터 스트림 활성화 확인
    - ECG, IMU, ACC, Memory, Heart Rate, Battery
 5. **WriteSet**: Stop → 측정 종료
+6. **WriteSet**: Reset Device → 디바이스 초기화
 
 **총 8개 테스트** (Read 7개 + 워크플로우 1개)
 
