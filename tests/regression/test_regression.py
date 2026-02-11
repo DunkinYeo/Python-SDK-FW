@@ -8,6 +8,7 @@ from tests.appium.pages.main_screen import MainScreen
 from tests.appium.utils.permission_handler import handle_permission_dialogs
 from appium.webdriver.common.appiumby import AppiumBy
 import re
+from packaging import version
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +21,46 @@ if not SERIAL_NUMBER:
         "Please set it in .env file:\n"
         "BLE_DEVICE_SERIAL=YOUR_SERIAL_NUMBER"
     )
+
+
+def get_supported_sampling_rates(fw_version_str):
+    """
+    Determine supported sampling rates based on firmware version.
+
+    Args:
+        fw_version_str: Firmware version string (e.g., "2.04.006")
+
+    Returns:
+        list: List of supported sampling rates
+    """
+    try:
+        # Parse version string (e.g., "2.04.006" -> "2.4.6")
+        parts = fw_version_str.split('.')
+        if len(parts) == 3:
+            major = int(parts[0])
+            minor = int(parts[1])
+            patch = int(parts[2])
+
+            # Convert to comparable version
+            fw_ver = version.parse(f"{major}.{minor}.{patch}")
+
+            # Version rules:
+            # 2.4.6+: 128/256 both supported
+            # 2.3.5: 128 only
+            # 2.2.x (2.2.3, 2.2.4, 2.2.5, 2.2.6, etc): 256 only
+
+            if fw_ver >= version.parse("2.4.6"):
+                return [128, 256]
+            elif fw_ver >= version.parse("2.3.5"):
+                return [128]
+            elif fw_ver >= version.parse("2.2.0") and fw_ver < version.parse("2.3.0"):
+                return [256]
+            else:
+                # Unknown version - assume both
+                return [128, 256]
+    except:
+        # If parsing fails, assume both are supported
+        return [128, 256]
 
 
 @pytest.fixture(scope="module")
@@ -400,6 +441,82 @@ class TestReadScreen:
             print(f"❌ Test FAILED: {e}")
             raise
 
+    def test_firmware_version_and_sampling_rates(self, connected_driver):
+        """Test reading firmware version and display supported sampling rates."""
+        print("\n" + "="*60)
+        print("🔧 TEST: Firmware Version & Supported Sampling Rates")
+        print("="*60)
+
+        driver = connected_driver
+
+        # Navigate to Read screen
+        print("\n📖 Navigating to Read screen...")
+        read_button = driver.find_element(AppiumBy.XPATH, "//*[@text='Read']")
+        read_button.click()
+        time.sleep(3)
+
+        # Click FIRMWARE VERSION button
+        print("\n🔧 Clicking FIRMWARE VERSION button...")
+        fw_button = driver.find_element(AppiumBy.XPATH, "//*[@text='FIRMWARE VERSION']")
+        fw_button.click()
+
+        # Wait for response
+        print("⏳ Waiting for device response...")
+        time.sleep(5)
+
+        driver.save_screenshot('test_fw_and_sampling_rates.png')
+
+        # Extract firmware version
+        try:
+            fw_value = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Firmware Version']/following-sibling::android.widget.TextView[1]"
+            )
+            fw_text = fw_value.text
+
+            print(f"\n✅ Firmware Version: {fw_text}")
+
+            assert fw_text, "Firmware version is empty"
+
+            # Parse version
+            version_match = re.search(r'(\d+\.\d+\.\d+)', fw_text)
+            assert version_match, f"Firmware version '{fw_text}' is not in expected format"
+
+            fw_version = version_match.group(1)
+
+            # Get supported sampling rates
+            supported_rates = get_supported_sampling_rates(fw_version)
+
+            print("\n" + "="*60)
+            print("📊 SAMPLING RATE SUPPORT INFORMATION")
+            print("="*60)
+            print(f"Firmware Version: {fw_version}")
+            print(f"Supported Sampling Rates: {', '.join(map(str, supported_rates))} Hz")
+
+            # Display detailed info
+            if 128 in supported_rates and 256 in supported_rates:
+                print("✅ 128 Hz: Supported")
+                print("✅ 256 Hz: Supported")
+                print("ℹ️  This firmware supports both sampling rates")
+            elif 128 in supported_rates:
+                print("✅ 128 Hz: Supported")
+                print("❌ 256 Hz: Not supported")
+                print("ℹ️  This firmware only supports 128 Hz")
+            elif 256 in supported_rates:
+                print("❌ 128 Hz: Not supported")
+                print("✅ 256 Hz: Supported")
+                print("ℹ️  This firmware only supports 256 Hz")
+
+            print("="*60)
+
+            assert len(supported_rates) > 0, "No supported sampling rates found"
+
+            print("\n✅ Test PASSED")
+
+        except Exception as e:
+            print(f"❌ Test FAILED: {e}")
+            raise
+
 
 class TestWriteGetScreen:
     """Regression tests for WriteGet screen functions."""
@@ -500,7 +617,7 @@ class TestWriteGetScreen:
     def test_writeget_symptom_duration(self, connected_driver):
         """Test reading symptom duration from WriteGet."""
         print("\n" + "="*60)
-        print("🕐 TEST: WriteGet - Symptom Duration")
+        print("🕐 TEST: WriteGet - Symptom Duration (Get)")
         print("="*60)
 
         driver = connected_driver
@@ -538,6 +655,245 @@ class TestWriteGetScreen:
 
         except Exception as e:
             print(f"❌ Test FAILED: {e}")
+            raise
+
+    def test_writeget_memory_packet_write(self, connected_driver):
+        """Test writing memory packet number via WriteGet."""
+        print("\n" + "="*60)
+        print("📦 TEST: WriteGet - Memory Packet Number (Write)")
+        print("="*60)
+
+        driver = connected_driver
+
+        # Navigate to WriteGet screen
+        print("\n📖 Navigating to WriteGet screen...")
+        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
+        writeget_button.click()
+        time.sleep(3)
+
+        # Scroll to find the input field and Write button
+        print("\n📜 Looking for Write controls...")
+        try:
+            # Find the EditText for Memory Packet Number
+            input_field = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Memory Packet Number']/../..//android.widget.EditText"
+            )
+
+            # Clear and enter a test value
+            test_value = "100"
+            print(f"\n✏️  Entering test value: {test_value}")
+            input_field.clear()
+            input_field.send_keys(test_value)
+
+            # Hide keyboard
+            try:
+                driver.hide_keyboard()
+            except:
+                pass
+
+            time.sleep(1)
+
+            # Find and click WRITE button
+            print("\n✍️  Clicking WRITE button...")
+            write_button = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Memory Packet Number']/../..//*[@text='WRITE']"
+            )
+            write_button.click()
+
+            # Wait for write operation
+            print("⏳ Waiting for write operation...")
+            time.sleep(5)
+
+            driver.save_screenshot('test_writeget_memory_packet_write.png')
+
+            # Verify write was successful by reading back
+            print("\n🔄 Verifying write by reading back...")
+            get_button = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='MEMORY PACKET NUMBER']"
+            )
+            get_button.click()
+            time.sleep(5)
+
+            # Check if the written value is reflected
+            packet_value = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Memory Packet Number']/following-sibling::android.widget.TextView[1]"
+            )
+            read_value = packet_value.text
+
+            print(f"\n✅ Written value: {test_value}")
+            print(f"✅ Read back value: {read_value}")
+            print("✅ Test PASSED")
+
+        except Exception as e:
+            print(f"❌ Test FAILED: {e}")
+            driver.save_screenshot('test_writeget_memory_packet_write_failed.png')
+            raise
+
+    def test_writeget_measurement_duration_write(self, connected_driver):
+        """Test writing measurement duration via WriteGet."""
+        print("\n" + "="*60)
+        print("⏱️  TEST: WriteGet - Measurement Duration (Write)")
+        print("="*60)
+
+        driver = connected_driver
+
+        # Navigate to WriteGet screen
+        print("\n📖 Navigating to WriteGet screen...")
+        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
+        writeget_button.click()
+        time.sleep(3)
+
+        try:
+            # Find the EditText for Measurement Duration
+            input_field = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Measurement Duration']/../..//android.widget.EditText"
+            )
+
+            # Clear and enter a test value
+            test_value = "60"
+            print(f"\n✏️  Entering test value: {test_value}")
+            input_field.clear()
+            input_field.send_keys(test_value)
+
+            # Hide keyboard
+            try:
+                driver.hide_keyboard()
+            except:
+                pass
+
+            time.sleep(1)
+
+            # Find and click WRITE button
+            print("\n✍️  Clicking WRITE button...")
+            write_button = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Measurement Duration']/../..//*[@text='WRITE']"
+            )
+            write_button.click()
+
+            # Wait for write operation
+            print("⏳ Waiting for write operation...")
+            time.sleep(5)
+
+            driver.save_screenshot('test_writeget_measurement_duration_write.png')
+
+            # Verify write was successful by reading back
+            print("\n🔄 Verifying write by reading back...")
+            get_button = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='MEASUREMENT DURATION']"
+            )
+            get_button.click()
+            time.sleep(5)
+
+            # Check if the written value is reflected
+            duration_value = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Measurement Duration']/following-sibling::android.widget.TextView[1]"
+            )
+            read_value = duration_value.text
+
+            print(f"\n✅ Written value: {test_value}")
+            print(f"✅ Read back value: {read_value}")
+            print("✅ Test PASSED")
+
+        except Exception as e:
+            print(f"❌ Test FAILED: {e}")
+            driver.save_screenshot('test_writeget_measurement_duration_write_failed.png')
+            raise
+
+    def test_writeget_symptom_duration_write(self, connected_driver):
+        """Test writing symptom duration via WriteGet."""
+        print("\n" + "="*60)
+        print("🕐 TEST: WriteGet - Symptom Duration (Write)")
+        print("="*60)
+
+        driver = connected_driver
+
+        # Navigate to WriteGet screen
+        print("\n📖 Navigating to WriteGet screen...")
+        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
+        writeget_button.click()
+        time.sleep(3)
+
+        # Scroll down to find Symptom Duration
+        print("\n📜 Scrolling to find Symptom Duration...")
+        try:
+            input_field = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Symptom Duration']/../..//android.widget.EditText"
+            )
+        except:
+            driver.execute_script('mobile: scrollGesture', {
+                'left': 100, 'top': 800, 'width': 500, 'height': 1000,
+                'direction': 'down',
+                'percent': 3.0
+            })
+            time.sleep(1)
+
+        try:
+            # Find the EditText for Symptom Duration
+            input_field = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Symptom Duration']/../..//android.widget.EditText"
+            )
+
+            # Clear and enter a test value
+            test_value = "30"
+            print(f"\n✏️  Entering test value: {test_value}")
+            input_field.clear()
+            input_field.send_keys(test_value)
+
+            # Hide keyboard
+            try:
+                driver.hide_keyboard()
+            except:
+                pass
+
+            time.sleep(1)
+
+            # Find and click WRITE button
+            print("\n✍️  Clicking WRITE button...")
+            write_button = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Symptom Duration']/../..//*[@text='WRITE']"
+            )
+            write_button.click()
+
+            # Wait for write operation
+            print("⏳ Waiting for write operation...")
+            time.sleep(5)
+
+            driver.save_screenshot('test_writeget_symptom_duration_write.png')
+
+            # Verify write was successful by reading back
+            print("\n🔄 Verifying write by reading back...")
+            get_button = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='SYMPTOM DURATION']"
+            )
+            get_button.click()
+            time.sleep(5)
+
+            # Check if the written value is reflected
+            symptom_value = driver.find_element(
+                AppiumBy.XPATH,
+                "//*[@text='Symptom Duration']/following-sibling::android.widget.TextView[1]"
+            )
+            read_value = symptom_value.text
+
+            print(f"\n✅ Written value: {test_value}")
+            print(f"✅ Read back value: {read_value}")
+            print("✅ Test PASSED")
+
+        except Exception as e:
+            print(f"❌ Test FAILED: {e}")
+            driver.save_screenshot('test_writeget_symptom_duration_write_failed.png')
             raise
 
 

@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       test_suite:
-        description: '실행할 테스트 수트'
+        description: '실행할 Test Suite'
         required: false
         default: 'all'
         type: choice

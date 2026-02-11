@@ -106,23 +106,31 @@ appium &
 
 ## 🧪 테스트 항목
 
-### Read 화면 (6개 테스트)
+### Read 화면 (7개 테스트)
 - ✅ Battery Level
 - ✅ Model Number
 - ✅ Serial Number
 - ✅ Firmware Version
 - ✅ Hardware Version
 - ✅ Software Version
+- ✅ **Firmware Version & Supported Sampling Rates** (신규)
+  - 펌웨어 버전에 따른 지원 샘플링 레이트 자동 표시
+  - 2.4.6+: 128/256 Hz 모두 지원
+  - 2.3.5: 128 Hz만 지원
+  - 2.2.x: 256 Hz만 지원
 
-### WriteGet 화면 (3개 테스트)
-- ✅ Memory Packet Number
-- ✅ Measurement Duration
-- ✅ Symptom Duration
+### WriteGet 화면 (6개 테스트)
+- ✅ Memory Packet Number (Get)
+- ✅ Measurement Duration (Get)
+- ✅ Symptom Duration (Get)
+- ✅ **Memory Packet Number (Write)** (신규)
+- ✅ **Measurement Duration (Write)** (신규)
+- ✅ **Symptom Duration (Write)** (신규)
 
 ### Notify 화면 (1개 테스트)
 - ✅ 모든 알림 요소 존재 확인 (ECG, IMU, ACC, GYRO, Memory, Heart Rate, Battery)
 
-**총 10개 테스트 항목**
+**총 14개 테스트 항목** (기존 10개 → 14개로 증가)
 
 ---
 
@@ -162,7 +170,7 @@ appium &
 1. GitHub Repository → **Actions** 탭
 2. **"SDK 검증 자동화 테스트"** 선택
 3. **"Run workflow"** 버튼 클릭
-4. 테스트 수트 선택 (all/read_only/writeget_only/notify_only)
+4. Test Suite 선택 (all/read_only/writeget_only/notify_only)
 5. 실행!
 
 ### 자동 실행
@@ -289,7 +297,7 @@ py-automation/
 │   │   ├── pages/             # Page Object Model
 │   │   └── utils/             # 유틸리티 함수
 │   └── regression/
-│       └── test_regression.py # Regression 테스트 수트
+│       └── test_regression.py # Regression Test Suite
 ├── CI_CD_SETUP.md             # CI/CD 설정 가이드
 ├── QUICK_START.md             # 빠른 시작 가이드
 └── README.md                  # 이 파일
@@ -339,7 +347,7 @@ py-automation/
   - ✅ QUICK_START.md 가이드 추가
   - ✅ 새 사용자 경험 개선
 - **2026-02-10**:
-  - ✅ Regression 테스트 수트 완성 (10개 테스트)
+  - ✅ Regression Test Suite 완성 (10개 테스트)
   - ✅ Slack 알림 기능 추가
   - ✅ GitHub Actions 워크플로우 구축
   - ✅ CI/CD 문서화 완료
