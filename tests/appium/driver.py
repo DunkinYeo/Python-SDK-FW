@@ -1,4 +1,5 @@
 from appium import webdriver
+from appium.options.android import UiAutomator2Options
 import os
 
 
@@ -14,14 +15,25 @@ def get_driver():
       - APPIUM_APP_PACKAGE (optional: app package name)
       - APPIUM_APP_ACTIVITY (optional: main activity)
     """
-    desired_caps = {
-        'platformName': os.getenv('APPIUM_PLATFORM_NAME', 'Android'),
-        'deviceName': os.getenv('APPIUM_DEVICE_NAME', 'Android Emulator'),
-        'app': os.getenv('APPIUM_APP_PATH', ''),
-        'automationName': os.getenv('APPIUM_AUTOMATION_NAME', 'UiAutomator2'),
-        # RECORD-EX app specifics (from AndroidManifest.xml)
-        'appPackage': os.getenv('APPIUM_APP_PACKAGE', 'com.wellysis.spatch.tool.record.ex'),
-        'appActivity': os.getenv('APPIUM_APP_ACTIVITY', 'com.wellysis.spatch.tool.record.presentation.main.MainActivity'),
-    }
+    # Create options object (new Appium API)
+    options = UiAutomator2Options()
+    options.platform_name = os.getenv('APPIUM_PLATFORM_NAME', 'Android')
+    options.device_name = os.getenv('APPIUM_DEVICE_NAME', 'Android Emulator')
+
+    app_path = os.getenv('APPIUM_APP_PATH', '')
+    if app_path:
+        options.app = app_path
+
+    # SDK Sample app specifics
+    options.app_package = os.getenv('APPIUM_APP_PACKAGE', 'com.wellysis.spatch.sdk.sample')
+    options.app_activity = os.getenv('APPIUM_APP_ACTIVITY', 'com.wellysis.spatch.sdk.sample.MainActivity')
+
+    # Automatically grant permissions (location, bluetooth, notifications, etc.)
+    options.auto_grant_permissions = True
+
+    # Don't reset app state between sessions (keeps app running and connected)
+    options.no_reset = True
+    options.full_reset = False
+
     server_url = os.getenv('APPIUM_SERVER_URL', 'http://localhost:4723/wd/hub')
-    return webdriver.Remote(server_url, desired_caps)
+    return webdriver.Remote(server_url, options=options)

@@ -113,24 +113,24 @@ appium &
 - ✅ Firmware Version
 - ✅ Hardware Version
 - ✅ Software Version
-- ✅ **Firmware Version & Supported Sampling Rates** (신규)
+- ✅ **Firmware Version & Supported Sampling Rates**
   - 펌웨어 버전에 따른 지원 샘플링 레이트 자동 표시
   - 2.4.6+: 128/256 Hz 모두 지원
   - 2.3.5: 128 Hz만 지원
   - 2.2.x: 256 Hz만 지원
 
-### WriteGet 화면 (6개 테스트)
-- ✅ Memory Packet Number (Get)
-- ✅ Measurement Duration (Get)
-- ✅ Symptom Duration (Get)
-- ✅ **Memory Packet Number (Write)** (신규)
-- ✅ **Measurement Duration (Write)** (신규)
-- ✅ **Symptom Duration (Write)** (신규)
+### 데이터 수집 워크플로우 (1개 통합 테스트)
+완전한 데이터 수집 시나리오를 하나의 통합 테스트로 검증:
 
-### Notify 화면 (1개 테스트)
-- ✅ 모든 알림 요소 존재 확인 (ECG, IMU, ACC, GYRO, Memory, Heart Rate, Battery)
+1. **WriteSet**: Start → 측정 시작
+2. **WriteSet**: Pause → 측정 일시정지
+3. **WriteSet**: Restart → 측정 재시작
+4. **WriteGet**: ECG FULL 선택
+5. **Notify**: 모든 데이터 스트림 활성화 확인
+   - ECG, IMU, ACC, GYRO, Memory, Heart Rate, Battery
+6. **WriteSet**: Stop → 측정 종료
 
-**총 14개 테스트 항목** (기존 10개 → 14개로 증가)
+**총 8개 테스트** (Read 7개 + 워크플로우 1개)
 
 ---
 

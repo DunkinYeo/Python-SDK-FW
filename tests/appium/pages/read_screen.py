@@ -1,50 +1,32 @@
-"""Read screen page object for SDK validation app."""
+"""Read screen page object for SDK Sample app."""
 import re
+import time
 from appium.webdriver.common.appiumby import AppiumBy
 from tests.appium.pages.base_page import BasePage
 
 
 class ReadScreen(BasePage):
-    """Page object for Read screen where FW version can be read."""
+    """Page object for Read screen where device information can be read."""
 
     # ==================================================
-    # IMPORTANT: Customize these locators for your app!
+    # SDK Sample app - Read screen
     # ==================================================
-    # Use Appium Inspector to identify the correct elements
 
-    # Read screen title/header
-    READ_TITLE = (AppiumBy.ID, "com.yourapp:id/read_title")
-    READ_TITLE_TEXT = (AppiumBy.XPATH, "//*[contains(@text, 'Read')]")
+    # Read options - Label (informational text)
+    BATTERY_LABEL = (AppiumBy.XPATH, "//*[@text='Battery']")
+    MODEL_NUMBER_LABEL = (AppiumBy.XPATH, "//*[@text='Model Number']")
+    SERIAL_NUMBER_LABEL = (AppiumBy.XPATH, "//*[@text='Serial Number']")
+    FW_VERSION_LABEL = (AppiumBy.XPATH, "//*[@text='Firmware Version']")
+    HW_VERSION_LABEL = (AppiumBy.XPATH, "//*[@text='Hardware Version']")
+    SW_VERSION_LABEL = (AppiumBy.XPATH, "//*[@text='Software Version']")
 
-    # Option list items (customize based on your app's structure)
-    # Example: ListView, RecyclerView items
-    OPTION_LIST = (AppiumBy.ID, "com.yourapp:id/option_list")
-
-    # Firmware version option
-    FW_VERSION_OPTION = (AppiumBy.XPATH, "//*[@text='Firmware version']")
-    FW_VERSION_OPTION_KR = (AppiumBy.XPATH, "//*[@text='펌웨어 버전']")
-    FW_VERSION_OPTION_ID = (AppiumBy.ID, "com.yourapp:id/fw_version_option")
-
-    # Alternative patterns to find firmware option
-    FW_OPTION_CONTAINS = (AppiumBy.XPATH, "//*[contains(@text, 'Firmware')]")
-    FW_OPTION_CONTAINS_KR = (AppiumBy.XPATH, "//*[contains(@text, '펌웨어')]")
-
-    # Version display (after selecting firmware version)
-    VERSION_DISPLAY = (AppiumBy.ID, "com.yourapp:id/version_value")
-    VERSION_TEXT = (AppiumBy.ID, "com.yourapp:id/version_text")
-    RESULT_TEXT = (AppiumBy.ID, "com.yourapp:id/result_text")
-
-    # Alternative: Generic text view that displays result
-    GENERIC_TEXT_VIEW = (AppiumBy.CLASS_NAME, "android.widget.TextView")
-
-    # Buttons
-    READ_EXECUTE_BUTTON = (AppiumBy.ID, "com.yourapp:id/read_button")
-    BACK_BUTTON = (AppiumBy.ID, "com.yourapp:id/back_button")
-    CLOSE_BUTTON = (AppiumBy.XPATH, "//*[@text='Close']")
-
-    # Sampling rate related
-    SAMPLING_RATE_OPTION = (AppiumBy.XPATH, "//*[@text='Sampling rate']")
-    SAMPLING_RATE_VALUE = (AppiumBy.ID, "com.yourapp:id/sampling_rate_value")
+    # Read options - Buttons (clickable to execute read operation)
+    BATTERY_BUTTON = (AppiumBy.XPATH, "//*[@text='BATTERY']")
+    MODEL_NUMBER_BUTTON = (AppiumBy.XPATH, "//*[@text='MODEL NUMBER']")
+    SERIAL_NUMBER_BUTTON = (AppiumBy.XPATH, "//*[@text='SERIAL NUMBER']")
+    FW_VERSION_BUTTON = (AppiumBy.XPATH, "//*[@text='FIRMWARE VERSION']")
+    HW_VERSION_BUTTON = (AppiumBy.XPATH, "//*[@text='HARDWARE VERSION']")
+    SW_VERSION_BUTTON = (AppiumBy.XPATH, "//*[@text='SOFTWARE VERSION']")
 
     def __init__(self, driver):
         """Initialize read screen page object."""
@@ -53,7 +35,7 @@ class ReadScreen(BasePage):
 
     def is_screen_loaded(self, timeout: int = 10) -> bool:
         """
-        Check if Read screen is loaded.
+        Check if Read screen is loaded by looking for any read option labels.
 
         Args:
             timeout: Timeout in seconds
@@ -63,13 +45,10 @@ class ReadScreen(BasePage):
         """
         self.logger.info("Checking if Read screen is loaded")
         try:
-            # Try to find Read screen title or option list
-            if self.is_element_present(self.READ_TITLE, timeout):
-                return True
-            if self.is_element_present(self.READ_TITLE_TEXT, timeout):
-                return True
-            # Check if option list is present
-            return self.is_element_present(self.OPTION_LIST, timeout)
+            # Check if any of the read option labels are present
+            return (self.is_element_present(self.FW_VERSION_LABEL, timeout) or
+                    self.is_element_present(self.BATTERY_LABEL, timeout) or
+                    self.is_element_present(self.MODEL_NUMBER_LABEL, timeout))
         except Exception as e:
             self.logger.error(f"Read screen not loaded: {e}")
             self.take_screenshot("read_screen_not_loaded")
@@ -77,53 +56,33 @@ class ReadScreen(BasePage):
 
     def select_firmware_version(self) -> bool:
         """
-        Select 'Firmware version' option from the Read menu.
+        Click 'FIRMWARE VERSION' button to read firmware version from device.
+
+        Note: This requires a BLE device to be connected.
 
         Returns:
-            True if selection successful
+            True if button click successful
         """
-        self.logger.info("Selecting Firmware version option")
+        self.logger.info("Clicking FIRMWARE VERSION button")
         try:
-            # Try different ways to find and click firmware version option
-
-            # Method 1: Try exact text match (English)
-            if self.safe_click(self.FW_VERSION_OPTION):
-                self.logger.info("Selected FW version option (exact text)")
+            # Click the FIRMWARE VERSION button
+            if self.safe_click(self.FW_VERSION_BUTTON):
+                self.logger.info("Clicked FIRMWARE VERSION button")
                 return True
 
-            # Method 2: Try exact text match (Korean)
-            if self.safe_click(self.FW_VERSION_OPTION_KR):
-                self.logger.info("Selected FW version option (Korean text)")
-                return True
-
-            # Method 3: Try by ID
-            if self.safe_click(self.FW_VERSION_OPTION_ID):
-                self.logger.info("Selected FW version option (by ID)")
-                return True
-
-            # Method 4: Try contains text (English)
-            if self.safe_click(self.FW_OPTION_CONTAINS):
-                self.logger.info("Selected FW version option (contains text)")
-                return True
-
-            # Method 5: Try contains text (Korean)
-            if self.safe_click(self.FW_OPTION_CONTAINS_KR):
-                self.logger.info("Selected FW version option (contains Korean)")
-                return True
-
-            # Method 6: Try scrolling to find it
-            self.logger.info("Trying to scroll to find FW version option")
-            if self.scroll_to_element(self.FW_VERSION_OPTION):
-                if self.safe_click(self.FW_VERSION_OPTION):
+            # If direct click fails, try scrolling to find it
+            self.logger.info("Trying to scroll to find FIRMWARE VERSION button")
+            if self.scroll_to_element(self.FW_VERSION_BUTTON):
+                if self.safe_click(self.FW_VERSION_BUTTON):
                     return True
 
-            self.logger.error("Failed to find and click Firmware version option")
-            self.take_screenshot("fw_option_not_found")
+            self.logger.error("Failed to click FIRMWARE VERSION button")
+            self.take_screenshot("fw_button_not_found")
             return False
 
         except Exception as e:
-            self.logger.error(f"Error selecting firmware version: {e}")
-            self.take_screenshot("select_fw_error")
+            self.logger.error(f"Error clicking firmware version button: {e}")
+            self.take_screenshot("click_fw_button_error")
             return False
 
     def execute_read(self) -> bool:
@@ -149,47 +108,42 @@ class ReadScreen(BasePage):
 
     def read_fw_version(self, wait_time: int = 5) -> str:
         """
-        Read the displayed firmware version.
+        Read the displayed firmware version after clicking FIRMWARE VERSION button.
+
+        The version appears in a TextView immediately following the "Firmware Version" label.
 
         Args:
-            wait_time: Time to wait for version to appear
+            wait_time: Time to wait for version to appear (device communication time)
 
         Returns:
             Firmware version string or empty string if not found
         """
         self.logger.info("Reading firmware version from display")
         try:
-            # Give device time to respond
-            import time
+            # Give device time to communicate and respond
             time.sleep(wait_time)
 
-            # Try different ways to find version display
+            # Method 1: Find the TextView right after "Firmware Version" label
+            # XPath: Get the next sibling TextView after Firmware Version label
+            try:
+                fw_value_elem = self.driver.find_element(
+                    AppiumBy.XPATH,
+                    "//*[@text='Firmware Version']/following-sibling::android.widget.TextView[1]"
+                )
+                version_text = fw_value_elem.text
+                if version_text:
+                    fw_version = self._extract_version_from_text(version_text)
+                    if fw_version:
+                        self.logger.info(f"Found FW version: {fw_version}")
+                        return fw_version
+                    # If no version pattern found, return the raw text
+                    elif version_text.strip():
+                        self.logger.info(f"Found FW version (raw): {version_text}")
+                        return version_text.strip()
+            except Exception as e:
+                self.logger.debug(f"Method 1 failed: {e}")
 
-            # Method 1: Dedicated version display element
-            version_text = self.safe_get_text(self.VERSION_DISPLAY, timeout=5)
-            if version_text:
-                fw_version = self._extract_version_from_text(version_text)
-                if fw_version:
-                    self.logger.info(f"Found FW version: {fw_version}")
-                    return fw_version
-
-            # Method 2: Generic version text element
-            version_text = self.safe_get_text(self.VERSION_TEXT, timeout=3)
-            if version_text:
-                fw_version = self._extract_version_from_text(version_text)
-                if fw_version:
-                    self.logger.info(f"Found FW version in text: {fw_version}")
-                    return fw_version
-
-            # Method 3: Result text element
-            version_text = self.safe_get_text(self.RESULT_TEXT, timeout=3)
-            if version_text:
-                fw_version = self._extract_version_from_text(version_text)
-                if fw_version:
-                    self.logger.info(f"Found FW version in result: {fw_version}")
-                    return fw_version
-
-            # Method 4: Search all TextViews for version pattern
+            # Method 2: Search all TextViews for version pattern
             text_views = self.find_elements_by_class("android.widget.TextView")
             for tv in text_views:
                 try:

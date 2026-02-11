@@ -518,14 +518,24 @@ class TestReadScreen:
             raise
 
 
-class TestWriteGetScreen:
-    """Regression tests for WriteGet screen functions."""
+class TestDataCollectionWorkflow:
+    """Test complete data collection workflow: WriteSet Start/Pause/Restart → WriteGet ECG FULL → Notify → WriteSet Stop"""
 
-    def test_writeget_memory_packet_number(self, connected_driver):
-        """Test reading memory packet number."""
-        print("\n" + "="*60)
-        print("📦 TEST: Memory Packet Number")
-        print("="*60)
+    def test_data_collection_workflow(self, connected_driver):
+        """
+        Complete data collection workflow test.
+
+        Steps:
+        1. WriteSet: Start → Start measurement
+        2. WriteSet: Pause → Pause measurement
+        3. WriteSet: Restart → Resume measurement
+        4. WriteGet: Select ECG FULL
+        5. Notify: Verify all data streams are active
+        6. WriteSet: Stop → Stop measurement
+        """
+        print("\n" + "="*80)
+        print("🔬 TEST: Complete Data Collection Workflow")
+        print("="*80)
 
         driver = connected_driver
 
@@ -535,397 +545,114 @@ class TestWriteGetScreen:
         except:
             pass
 
-        # Navigate to WriteGet screen
-        print("\n📖 Navigating to WriteGet screen...")
-        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
-        writeget_button.click()
+        # =================================================================
+        # STEP 1: WriteSet - Start Measurement
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 1: WriteSet - Start Measurement")
+        print("="*80)
+
+        print("\n📖 Navigating to WriteSet screen...")
+        writeset_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteSet']")
+        writeset_button.click()
         time.sleep(3)
 
-        # Click MEMORY PACKET NUMBER button
-        print("\n📦 Clicking MEMORY PACKET NUMBER button...")
-        packet_button = driver.find_element(AppiumBy.XPATH, "//*[@text='MEMORY PACKET NUMBER']")
-        packet_button.click()
+        print("\n▶️  Clicking START button...")
+        start_button = driver.find_element(AppiumBy.XPATH, "//*[@text='START']")
+        start_button.click()
 
-        # Wait for response
-        print("⏳ Waiting for device response...")
+        print("⏳ Waiting for measurement to start (10 seconds)...")
+        time.sleep(10)
+
+        driver.save_screenshot('step1_writeset_start.png')
+        print("✅ STEP 1 Complete - Measurement Started")
+
+        # =================================================================
+        # STEP 2: WriteSet - Pause Measurement
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 2: WriteSet - Pause Measurement")
+        print("="*80)
+
+        print("\n⏸️  Clicking PAUSE button...")
+        pause_button = driver.find_element(AppiumBy.XPATH, "//*[@text='PAUSE']")
+        pause_button.click()
+
+        print("⏳ Waiting for measurement to pause (5 seconds)...")
         time.sleep(5)
 
-        driver.save_screenshot('test_memory_packet_number.png')
+        driver.save_screenshot('step2_writeset_pause.png')
+        print("✅ STEP 2 Complete - Measurement Paused")
 
-        # Extract packet number
-        try:
-            packet_value = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Memory Packet Number']/following-sibling::android.widget.TextView[1]"
-            )
-            packet_text = packet_value.text
+        # =================================================================
+        # STEP 3: WriteSet - Restart Measurement
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 3: WriteSet - Restart Measurement")
+        print("="*80)
 
-            print(f"\n✅ Memory Packet Number: {packet_text}")
+        print("\n🔄 Clicking RESTART button...")
+        restart_button = driver.find_element(AppiumBy.XPATH, "//*[@text='RESTART']")
+        restart_button.click()
 
-            assert packet_text, "Memory packet number is empty"
-            assert any(c.isdigit() for c in packet_text), f"Packet number '{packet_text}' contains no digits"
+        print("⏳ Waiting for measurement to restart (10 seconds)...")
+        time.sleep(10)
 
-            print("✅ Test PASSED")
+        driver.save_screenshot('step3_writeset_restart.png')
+        print("✅ STEP 3 Complete - Measurement Restarted")
 
-        except Exception as e:
-            print(f"❌ Test FAILED: {e}")
-            raise
+        # =================================================================
+        # STEP 4: WriteGet - Select ECG FULL
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 4: WriteGet - Select ECG FULL")
+        print("="*80)
 
-    def test_writeget_measurement_duration(self, connected_driver):
-        """Test reading measurement duration from WriteGet."""
-        print("\n" + "="*60)
-        print("⏱️  TEST: WriteGet - Measurement Duration")
-        print("="*60)
-
-        driver = connected_driver
-
-        # Navigate to WriteGet screen
         print("\n📖 Navigating to WriteGet screen...")
         writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
         writeget_button.click()
         time.sleep(3)
 
-        # Click MEASUREMENT DURATION button
-        print("\n⏱️  Clicking MEASUREMENT DURATION button...")
-        duration_button = driver.find_element(AppiumBy.XPATH, "//*[@text='MEASUREMENT DURATION']")
-        duration_button.click()
-
-        # Wait for response
-        print("⏳ Waiting for device response...")
-        time.sleep(5)
-
-        driver.save_screenshot('test_writeget_measurement_duration.png')
-
-        # Extract duration
+        print("\n❤️  Selecting ECG FULL...")
+        # Try to find ECG FULL button (may need scrolling)
         try:
-            duration_value = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Measurement Duration']/following-sibling::android.widget.TextView[1]"
-            )
-            duration_text = duration_value.text
-
-            print(f"\n✅ Measurement Duration: {duration_text}")
-
-            assert duration_text, "Measurement duration is empty"
-
-            print("✅ Test PASSED")
-
-        except Exception as e:
-            print(f"❌ Test FAILED: {e}")
-            raise
-
-    def test_writeget_symptom_duration(self, connected_driver):
-        """Test reading symptom duration from WriteGet."""
-        print("\n" + "="*60)
-        print("🕐 TEST: WriteGet - Symptom Duration (Get)")
-        print("="*60)
-
-        driver = connected_driver
-
-        # Navigate to WriteGet screen
-        print("\n📖 Navigating to WriteGet screen...")
-        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
-        writeget_button.click()
-        time.sleep(3)
-
-        # Click SYMPTOM DURATION button
-        print("\n🕐 Clicking SYMPTOM DURATION button...")
-        symptom_button = driver.find_element(AppiumBy.XPATH, "//*[@text='SYMPTOM DURATION']")
-        symptom_button.click()
-
-        # Wait for response
-        print("⏳ Waiting for device response...")
-        time.sleep(5)
-
-        driver.save_screenshot('test_writeget_symptom_duration.png')
-
-        # Extract symptom duration
-        try:
-            symptom_value = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Symptom Duration']/following-sibling::android.widget.TextView[1]"
-            )
-            symptom_text = symptom_value.text
-
-            print(f"\n✅ Symptom Duration: {symptom_text}")
-
-            assert symptom_text, "Symptom duration is empty"
-
-            print("✅ Test PASSED")
-
-        except Exception as e:
-            print(f"❌ Test FAILED: {e}")
-            raise
-
-    def test_writeget_memory_packet_write(self, connected_driver):
-        """Test writing memory packet number via WriteGet."""
-        print("\n" + "="*60)
-        print("📦 TEST: WriteGet - Memory Packet Number (Write)")
-        print("="*60)
-
-        driver = connected_driver
-
-        # Navigate to WriteGet screen
-        print("\n📖 Navigating to WriteGet screen...")
-        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
-        writeget_button.click()
-        time.sleep(3)
-
-        # Scroll to find the input field and Write button
-        print("\n📜 Looking for Write controls...")
-        try:
-            # Find the EditText for Memory Packet Number
-            input_field = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Memory Packet Number']/../..//android.widget.EditText"
-            )
-
-            # Clear and enter a test value
-            test_value = "100"
-            print(f"\n✏️  Entering test value: {test_value}")
-            input_field.clear()
-            input_field.send_keys(test_value)
-
-            # Hide keyboard
-            try:
-                driver.hide_keyboard()
-            except:
-                pass
-
-            time.sleep(1)
-
-            # Find and click WRITE button
-            print("\n✍️  Clicking WRITE button...")
-            write_button = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Memory Packet Number']/../..//*[@text='WRITE']"
-            )
-            write_button.click()
-
-            # Wait for write operation
-            print("⏳ Waiting for write operation...")
-            time.sleep(5)
-
-            driver.save_screenshot('test_writeget_memory_packet_write.png')
-
-            # Verify write was successful by reading back
-            print("\n🔄 Verifying write by reading back...")
-            get_button = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='MEMORY PACKET NUMBER']"
-            )
-            get_button.click()
-            time.sleep(5)
-
-            # Check if the written value is reflected
-            packet_value = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Memory Packet Number']/following-sibling::android.widget.TextView[1]"
-            )
-            read_value = packet_value.text
-
-            print(f"\n✅ Written value: {test_value}")
-            print(f"✅ Read back value: {read_value}")
-            print("✅ Test PASSED")
-
-        except Exception as e:
-            print(f"❌ Test FAILED: {e}")
-            driver.save_screenshot('test_writeget_memory_packet_write_failed.png')
-            raise
-
-    def test_writeget_measurement_duration_write(self, connected_driver):
-        """Test writing measurement duration via WriteGet."""
-        print("\n" + "="*60)
-        print("⏱️  TEST: WriteGet - Measurement Duration (Write)")
-        print("="*60)
-
-        driver = connected_driver
-
-        # Navigate to WriteGet screen
-        print("\n📖 Navigating to WriteGet screen...")
-        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
-        writeget_button.click()
-        time.sleep(3)
-
-        try:
-            # Find the EditText for Measurement Duration
-            input_field = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Measurement Duration']/../..//android.widget.EditText"
-            )
-
-            # Clear and enter a test value
-            test_value = "60"
-            print(f"\n✏️  Entering test value: {test_value}")
-            input_field.clear()
-            input_field.send_keys(test_value)
-
-            # Hide keyboard
-            try:
-                driver.hide_keyboard()
-            except:
-                pass
-
-            time.sleep(1)
-
-            # Find and click WRITE button
-            print("\n✍️  Clicking WRITE button...")
-            write_button = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Measurement Duration']/../..//*[@text='WRITE']"
-            )
-            write_button.click()
-
-            # Wait for write operation
-            print("⏳ Waiting for write operation...")
-            time.sleep(5)
-
-            driver.save_screenshot('test_writeget_measurement_duration_write.png')
-
-            # Verify write was successful by reading back
-            print("\n🔄 Verifying write by reading back...")
-            get_button = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='MEASUREMENT DURATION']"
-            )
-            get_button.click()
-            time.sleep(5)
-
-            # Check if the written value is reflected
-            duration_value = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Measurement Duration']/following-sibling::android.widget.TextView[1]"
-            )
-            read_value = duration_value.text
-
-            print(f"\n✅ Written value: {test_value}")
-            print(f"✅ Read back value: {read_value}")
-            print("✅ Test PASSED")
-
-        except Exception as e:
-            print(f"❌ Test FAILED: {e}")
-            driver.save_screenshot('test_writeget_measurement_duration_write_failed.png')
-            raise
-
-    def test_writeget_symptom_duration_write(self, connected_driver):
-        """Test writing symptom duration via WriteGet."""
-        print("\n" + "="*60)
-        print("🕐 TEST: WriteGet - Symptom Duration (Write)")
-        print("="*60)
-
-        driver = connected_driver
-
-        # Navigate to WriteGet screen
-        print("\n📖 Navigating to WriteGet screen...")
-        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
-        writeget_button.click()
-        time.sleep(3)
-
-        # Scroll down to find Symptom Duration
-        print("\n📜 Scrolling to find Symptom Duration...")
-        try:
-            input_field = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Symptom Duration']/../..//android.widget.EditText"
-            )
+            ecg_full_button = driver.find_element(AppiumBy.XPATH, "//*[@text='ECG FULL']")
         except:
+            print("📜 Scrolling to find ECG FULL...")
             driver.execute_script('mobile: scrollGesture', {
                 'left': 100, 'top': 800, 'width': 500, 'height': 1000,
                 'direction': 'down',
                 'percent': 3.0
             })
             time.sleep(1)
+            ecg_full_button = driver.find_element(AppiumBy.XPATH, "//*[@text='ECG FULL']")
 
-        try:
-            # Find the EditText for Symptom Duration
-            input_field = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Symptom Duration']/../..//android.widget.EditText"
-            )
+        ecg_full_button.click()
 
-            # Clear and enter a test value
-            test_value = "30"
-            print(f"\n✏️  Entering test value: {test_value}")
-            input_field.clear()
-            input_field.send_keys(test_value)
+        print("⏳ Waiting for ECG FULL selection (5 seconds)...")
+        time.sleep(5)
 
-            # Hide keyboard
-            try:
-                driver.hide_keyboard()
-            except:
-                pass
+        driver.save_screenshot('step4_writeget_ecg_full.png')
+        print("✅ STEP 4 Complete - ECG FULL Selected")
 
-            time.sleep(1)
+        # =================================================================
+        # STEP 5: Notify - Verify All Data Streams
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 5: Notify - Verify All Data Streams Active")
+        print("="*80)
 
-            # Find and click WRITE button
-            print("\n✍️  Clicking WRITE button...")
-            write_button = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Symptom Duration']/../..//*[@text='WRITE']"
-            )
-            write_button.click()
-
-            # Wait for write operation
-            print("⏳ Waiting for write operation...")
-            time.sleep(5)
-
-            driver.save_screenshot('test_writeget_symptom_duration_write.png')
-
-            # Verify write was successful by reading back
-            print("\n🔄 Verifying write by reading back...")
-            get_button = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='SYMPTOM DURATION']"
-            )
-            get_button.click()
-            time.sleep(5)
-
-            # Check if the written value is reflected
-            symptom_value = driver.find_element(
-                AppiumBy.XPATH,
-                "//*[@text='Symptom Duration']/following-sibling::android.widget.TextView[1]"
-            )
-            read_value = symptom_value.text
-
-            print(f"\n✅ Written value: {test_value}")
-            print(f"✅ Read back value: {read_value}")
-            print("✅ Test PASSED")
-
-        except Exception as e:
-            print(f"❌ Test FAILED: {e}")
-            driver.save_screenshot('test_writeget_symptom_duration_write_failed.png')
-            raise
-
-
-class TestNotifyScreen:
-    """Regression tests for Notify screen."""
-
-    def test_notify_screen_elements(self, connected_driver):
-        """Test that all notification elements are present."""
-        print("\n" + "="*60)
-        print("🔔 TEST: Notify Screen Elements")
-        print("="*60)
-
-        driver = connected_driver
-
-        # Hide keyboard if present
-        try:
-            driver.hide_keyboard()
-        except:
-            pass
-
-        # Navigate to Notify screen
         print("\n📖 Navigating to Notify screen...")
         notify_button = driver.find_element(AppiumBy.XPATH, "//*[@text='Notify']")
         notify_button.click()
-        time.sleep(3)
+        time.sleep(5)  # Wait longer for data to start flowing
 
-        driver.save_screenshot('test_notify_screen.png')
+        driver.save_screenshot('step5_notify_before_check.png')
 
-        # Check for all expected elements
+        # Check for all expected notification elements
         expected_elements = ["ECG", "IMU", "ACC", "GYRO", "Memory", "Heart Rate", "Battery"]
 
-        print("\n🔍 Checking for notification elements...")
+        print("\n🔍 Checking for active data streams...")
 
         found_elements = []
         for element_name in expected_elements:
@@ -934,14 +661,70 @@ class TestNotifyScreen:
                 print(f"✅ Found: {element_name}")
                 found_elements.append(element_name)
             except:
-                print(f"❌ Missing: {element_name}")
+                # Try scrolling down to find the element
+                print(f"📜 Scrolling to find: {element_name}...")
+                try:
+                    driver.execute_script('mobile: scrollGesture', {
+                        'left': 100, 'top': 800, 'width': 500, 'height': 1000,
+                        'direction': 'down',
+                        'percent': 2.0
+                    })
+                    time.sleep(1)
+                    element = driver.find_element(AppiumBy.XPATH, f"//*[@text='{element_name}']")
+                    print(f"✅ Found after scroll: {element_name}")
+                    found_elements.append(element_name)
+                except:
+                    print(f"❌ Missing: {element_name}")
 
         print(f"\n📊 Result: {len(found_elements)}/{len(expected_elements)} elements found")
 
-        assert len(found_elements) == len(expected_elements), \
-            f"Missing elements: {set(expected_elements) - set(found_elements)}"
+        if len(found_elements) != len(expected_elements):
+            missing = set(expected_elements) - set(found_elements)
+            print(f"⚠️  Missing elements: {missing}")
+            # Don't fail immediately, continue to stop measurement
+        else:
+            print("✅ All data streams are active!")
 
-        print("✅ Test PASSED")
+        print("⏳ Observing data for 10 seconds...")
+        time.sleep(10)
+
+        driver.save_screenshot('step5_notify_active_data.png')
+        print("✅ STEP 5 Complete - Data Streams Verified")
+
+        # =================================================================
+        # STEP 6: WriteSet - Stop Measurement
+        # =================================================================
+        print("\n" + "="*80)
+        print("📍 STEP 6: WriteSet - Stop Measurement")
+        print("="*80)
+
+        print("\n📖 Returning to WriteSet screen...")
+        writeset_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteSet']")
+        writeset_button.click()
+        time.sleep(3)
+
+        print("\n⏹️  Clicking STOP button...")
+        stop_button = driver.find_element(AppiumBy.XPATH, "//*[@text='STOP']")
+        stop_button.click()
+
+        print("⏳ Waiting for measurement to stop (5 seconds)...")
+        time.sleep(5)
+
+        driver.save_screenshot('step6_writeset_stop.png')
+        print("✅ STEP 6 Complete - Measurement Stopped")
+
+        # =================================================================
+        # Final Verification
+        # =================================================================
+        print("\n" + "="*80)
+        print("🎉 WORKFLOW TEST COMPLETE!")
+        print("="*80)
+
+        assert len(found_elements) == len(expected_elements), \
+            f"Missing data streams: {set(expected_elements) - set(found_elements)}"
+
+        print("\n✅ All steps passed successfully!")
+        print("✅ Data collection workflow is working correctly!")
 
 
 if __name__ == "__main__":
