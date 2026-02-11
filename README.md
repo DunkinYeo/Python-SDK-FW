@@ -125,10 +125,9 @@ appium &
 1. **WriteSet**: Start → 측정 시작
 2. **WriteSet**: Pause → 측정 일시정지
 3. **WriteSet**: Restart → 측정 재시작
-4. **WriteGet**: ECG FULL 선택
-5. **Notify**: 모든 데이터 스트림 활성화 확인
-   - ECG, IMU, ACC, GYRO, Memory, Heart Rate, Battery
-6. **WriteSet**: Stop → 측정 종료
+4. **Notify**: 모든 데이터 스트림 활성화 확인
+   - ECG, IMU, ACC, Memory, Heart Rate, Battery
+5. **WriteSet**: Stop → 측정 종료
 
 **총 8개 테스트** (Read 7개 + 워크플로우 1개)
 

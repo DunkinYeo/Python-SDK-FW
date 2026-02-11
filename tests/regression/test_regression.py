@@ -529,9 +529,8 @@ class TestDataCollectionWorkflow:
         1. WriteSet: Start → Start measurement
         2. WriteSet: Pause → Pause measurement
         3. WriteSet: Restart → Resume measurement
-        4. WriteGet: Select ECG FULL
-        5. Notify: Verify all data streams are active
-        6. WriteSet: Stop → Stop measurement
+        4. Notify: Verify all data streams are active
+        5. WriteSet: Stop → Stop measurement
         """
         print("\n" + "="*80)
         print("🔬 TEST: Complete Data Collection Workflow")
@@ -602,44 +601,10 @@ class TestDataCollectionWorkflow:
         print("✅ STEP 3 Complete - Measurement Restarted")
 
         # =================================================================
-        # STEP 4: WriteGet - Select ECG FULL
+        # STEP 4: Notify - Verify All Data Streams
         # =================================================================
         print("\n" + "="*80)
-        print("📍 STEP 4: WriteGet - Select ECG FULL")
-        print("="*80)
-
-        print("\n📖 Navigating to WriteGet screen...")
-        writeget_button = driver.find_element(AppiumBy.XPATH, "//*[@text='WriteGet']")
-        writeget_button.click()
-        time.sleep(3)
-
-        print("\n❤️  Selecting ECG FULL...")
-        # Try to find ECG FULL button (may need scrolling)
-        try:
-            ecg_full_button = driver.find_element(AppiumBy.XPATH, "//*[@text='ECG FULL']")
-        except:
-            print("📜 Scrolling to find ECG FULL...")
-            driver.execute_script('mobile: scrollGesture', {
-                'left': 100, 'top': 800, 'width': 500, 'height': 1000,
-                'direction': 'down',
-                'percent': 3.0
-            })
-            time.sleep(1)
-            ecg_full_button = driver.find_element(AppiumBy.XPATH, "//*[@text='ECG FULL']")
-
-        ecg_full_button.click()
-
-        print("⏳ Waiting for ECG FULL selection (5 seconds)...")
-        time.sleep(5)
-
-        driver.save_screenshot('step4_writeget_ecg_full.png')
-        print("✅ STEP 4 Complete - ECG FULL Selected")
-
-        # =================================================================
-        # STEP 5: Notify - Verify All Data Streams
-        # =================================================================
-        print("\n" + "="*80)
-        print("📍 STEP 5: Notify - Verify All Data Streams Active")
+        print("📍 STEP 4: Notify - Verify All Data Streams Active")
         print("="*80)
 
         print("\n📖 Navigating to Notify screen...")
@@ -647,10 +612,11 @@ class TestDataCollectionWorkflow:
         notify_button.click()
         time.sleep(5)  # Wait longer for data to start flowing
 
-        driver.save_screenshot('step5_notify_before_check.png')
+        driver.save_screenshot('step4_notify_before_check.png')
 
         # Check for all expected notification elements
-        expected_elements = ["ECG", "IMU", "ACC", "GYRO", "Memory", "Heart Rate", "Battery"]
+        # Note: Gyro excluded as it's not present in current UI
+        expected_elements = ["ECG", "IMU", "ACC", "Memory", "Heart Rate", "Battery"]
 
         print("\n🔍 Checking for active data streams...")
 
@@ -688,14 +654,14 @@ class TestDataCollectionWorkflow:
         print("⏳ Observing data for 10 seconds...")
         time.sleep(10)
 
-        driver.save_screenshot('step5_notify_active_data.png')
-        print("✅ STEP 5 Complete - Data Streams Verified")
+        driver.save_screenshot('step4_notify_active_data.png')
+        print("✅ STEP 4 Complete - Data Streams Verified")
 
         # =================================================================
-        # STEP 6: WriteSet - Stop Measurement
+        # STEP 5: WriteSet - Stop Measurement
         # =================================================================
         print("\n" + "="*80)
-        print("📍 STEP 6: WriteSet - Stop Measurement")
+        print("📍 STEP 5: WriteSet - Stop Measurement")
         print("="*80)
 
         print("\n📖 Returning to WriteSet screen...")
@@ -710,8 +676,8 @@ class TestDataCollectionWorkflow:
         print("⏳ Waiting for measurement to stop (5 seconds)...")
         time.sleep(5)
 
-        driver.save_screenshot('step6_writeset_stop.png')
-        print("✅ STEP 6 Complete - Measurement Stopped")
+        driver.save_screenshot('step5_writeset_stop.png')
+        print("✅ STEP 5 Complete - Measurement Stopped")
 
         # =================================================================
         # Final Verification
