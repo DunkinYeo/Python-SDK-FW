@@ -199,7 +199,7 @@ python -m pytest tests/regression/test_regression.py -v -s --html=test-report.ht
 1. Repository > Actions 탭
 2. "SDK 검증 자동화 테스트" workflow 선택
 3. "Run workflow" 버튼 클릭
-4. 테스트 스위트 선택:
+4. 테스트 수트 선택:
    - `all`: 전체 테스트 (기본값)
    - `read_only`: Read 화면만
    - `writeget_only`: WriteGet 화면만

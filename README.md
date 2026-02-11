@@ -162,7 +162,7 @@ appium &
 1. GitHub Repository → **Actions** 탭
 2. **"SDK 검증 자동화 테스트"** 선택
 3. **"Run workflow"** 버튼 클릭
-4. 테스트 스위트 선택 (all/read_only/writeget_only/notify_only)
+4. 테스트 수트 선택 (all/read_only/writeget_only/notify_only)
 5. 실행!
 
 ### 자동 실행
@@ -289,7 +289,7 @@ py-automation/
 │   │   ├── pages/             # Page Object Model
 │   │   └── utils/             # 유틸리티 함수
 │   └── regression/
-│       └── test_regression.py # Regression 테스트 스위트
+│       └── test_regression.py # Regression 테스트 수트
 ├── CI_CD_SETUP.md             # CI/CD 설정 가이드
 ├── QUICK_START.md             # 빠른 시작 가이드
 └── README.md                  # 이 파일
@@ -339,7 +339,7 @@ py-automation/
   - ✅ QUICK_START.md 가이드 추가
   - ✅ 새 사용자 경험 개선
 - **2026-02-10**:
-  - ✅ Regression 테스트 스위트 완성 (10개 테스트)
+  - ✅ Regression 테스트 수트 완성 (10개 테스트)
   - ✅ Slack 알림 기능 추가
   - ✅ GitHub Actions 워크플로우 구축
   - ✅ CI/CD 문서화 완료
