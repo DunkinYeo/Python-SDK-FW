@@ -120,39 +120,13 @@ jobs:
         run: |
           echo "## 📊 Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-
           if [ -f .report.json ]; then
-            python -c "
-import json
-with open('.report.json') as f:
-    report = json.load(f)
-    summary = report.get('summary', {})
-    total = summary.get('total', 0)
-    passed = summary.get('passed', 0)
-    failed = summary.get('failed', 0)
-    duration = report.get('duration', 0)
-
-    print(f'**Total Tests:** {total}')
-    print(f'**✅ Passed:** {passed}')
-    print(f'**❌ Failed:** {failed}')
-    print(f'**⏱️  Duration:** {duration:.1f}s')
-    print(f'**📊 Pass Rate:** {passed/total*100:.1f}%' if total > 0 else '**📊 Pass Rate:** N/A')
-            " >> $GITHUB_STEP_SUMMARY
+            python .github/scripts/generate_test_summary.py >> $GITHUB_STEP_SUMMARY
           fi
 
       - name: ❌ Fail if tests failed
         if: always()
         run: |
           if [ -f .report.json ]; then
-            python -c "
-import json, sys
-with open('.report.json') as f:
-    report = json.load(f)
-    failed = report.get('summary', {}).get('failed', 0)
-    if failed > 0:
-        print(f'❌ {failed} test(s) failed')
-        sys.exit(1)
-    else:
-        print('✅ All tests passed')
-            "
+            python .github/scripts/check_test_failure.py
           fi
