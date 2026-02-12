@@ -127,10 +127,40 @@ appium &
 3. **WriteSet**: Restart → 측정 재시작
 4. **Notify**: 모든 데이터 스트림 활성화 확인
    - ECG, IMU, ACC, Memory, Heart Rate, Battery
-5. **WriteSet**: Stop → 측정 종료
-6. **WriteSet**: Reset Device → 디바이스 초기화
+5. **[선택] 장시간 안정성 테스트**: ECG 패킷 카운트 모니터링
+   - `--target-packets` 옵션으로 목표 패킷 수 설정
+   - 예: 1시간 = 3600 패킷, 1일 = 86400 패킷
+   - 목표 도달까지 자동 대기 및 진행률 표시
+6. **WriteSet**: Stop → 측정 종료
+7. **WriteSet**: Reset Device → 디바이스 초기화
 
 **총 8개 테스트** (Read 7개 + 워크플로우 1개)
+
+#### 장시간 안정성 테스트 예시
+
+**⚠️ 중요: 테스트 시작 전 준비사항**
+1. 앱에서 **WriteSet** → **STOP** 실행
+2. **WriteSet** → **RESET DEVICE** 실행
+3. Packet Number가 0으로 초기화되었는지 확인
+4. 테스트 시작
+
+```bash
+# 1시간 테스트 (3600 패킷)
+pytest tests/regression/test_regression.py::TestDataCollectionWorkflow \
+  --target-packets=3600 -v
+
+# 12시간 테스트 (43200 패킷)
+pytest tests/regression/test_regression.py::TestDataCollectionWorkflow \
+  --target-packets=43200 -v
+
+# 24시간 테스트 (86400 패킷)
+pytest tests/regression/test_regression.py::TestDataCollectionWorkflow \
+  --target-packets=86400 -v
+```
+
+**💡 팁:**
+- 테스트 시작 시 자동으로 앱을 force-stop하지만, 디바이스 상태는 초기화되지 않습니다
+- 이전 측정이 남아있으면 패킷 카운트가 계속 증가하여 테스트가 즉시 완료될 수 있습니다
 
 ---
 

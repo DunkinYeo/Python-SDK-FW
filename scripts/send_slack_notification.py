@@ -5,6 +5,10 @@ import requests
 import sys
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 def load_test_results():
@@ -82,7 +86,51 @@ def extract_device_info(report):
     return device_info
 
 
-def build_slack_payload(report, device_info):
+def extract_packet_info(report):
+    """Extract packet monitoring information from test output."""
+    import re
+
+    packet_info = {
+        "enabled": False,
+        "target_packets": 0,
+        "final_packets": 0,
+        "success": False
+    }
+
+    # Find data collection workflow test
+    for test in report.get('tests', []):
+        if 'test_data_collection_workflow' in test.get('nodeid', ''):
+            packet_info["enabled"] = True
+
+            if 'call' in test and 'stdout' in test['call']:
+                stdout = test['call']['stdout']
+
+                # Extract target packets
+                target_match = re.search(r'Target packets:\s*(\d+)', stdout)
+                if target_match:
+                    packet_info["target_packets"] = int(target_match.group(1))
+
+                # Extract final packet count
+                final_match = re.search(r'✅ Target reached.*?(\d+)\s*>=\s*(\d+)', stdout, re.DOTALL)
+                if final_match:
+                    packet_info["final_packets"] = int(final_match.group(1))
+                    packet_info["success"] = True
+                else:
+                    # Try to find last packet count if test didn't complete
+                    last_packet = re.findall(r'Packet count:.*?→\s*(\d+)', stdout)
+                    if last_packet:
+                        packet_info["final_packets"] = int(last_packet[-1])
+
+            # Check if test passed
+            if test.get('outcome') == 'passed':
+                packet_info["success"] = True
+
+            break
+
+    return packet_info
+
+
+def build_slack_payload(report, device_info, packet_info):
     """Build Slack message payload."""
     summary = report.get('summary', {})
 
@@ -155,6 +203,31 @@ def build_slack_payload(report, device_info):
             ]
         }
     ]
+
+    # Add packet monitoring section if enabled
+    if packet_info["enabled"]:
+        packet_status = "✅ 성공" if packet_info["success"] else "❌ 실패"
+        blocks.extend([
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*📦 패킷 모니터링*"
+                }
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*상태:*\n{packet_status}"},
+                    {"type": "mrkdwn", "text": f"*타겟 패킷:*\n`{packet_info['target_packets']}개`"},
+                    {"type": "mrkdwn", "text": f"*실제 패킷:*\n`{packet_info['final_packets']}개`"},
+                    {"type": "mrkdwn", "text": f"*달성률:*\n`{(packet_info['final_packets']/packet_info['target_packets']*100):.1f}%`" if packet_info['target_packets'] > 0 else "*달성률:*\n`N/A`"}
+                ]
+            }
+        ])
 
     # Add failed tests section if any
     if failed_tests:
@@ -267,9 +340,13 @@ def main():
     print("📱 Extracting device information...")
     device_info = extract_device_info(report)
 
+    # Extract packet info
+    print("📦 Extracting packet monitoring information...")
+    packet_info = extract_packet_info(report)
+
     # Build Slack payload
     print("🔨 Building Slack message...")
-    payload = build_slack_payload(report, device_info)
+    payload = build_slack_payload(report, device_info, packet_info)
 
     # Send to Slack
     print(f"📤 Sending to Slack webhook...")

@@ -1,9 +1,28 @@
 import pytest
 from tests.sampling.sampling_utils import get_supported_sampling_rates
 
+
+def pytest_addoption(parser):
+    """Add custom command line options."""
+    parser.addoption(
+        "--target-packets",
+        action="store",
+        default=None,
+        type=int,
+        help="Target packet count for long-term stability test (e.g., 3600 for 1 hour, 86400 for 1 day)"
+    )
+
+
+@pytest.fixture
+def target_packets(request):
+    """Get target packet count from command line option."""
+    return request.config.getoption("--target-packets")
+
+
 @pytest.fixture
 def actual_sampling_rate(app_env):
     return get_actual_sampling_rate(app_env)
+
 
 @pytest.fixture(scope="session")
 def app_env():
@@ -13,13 +32,8 @@ def app_env():
         "fw_version": "2.2.6"
     }
 
+
 @pytest.fixture(scope="function")
 def sampling_rate():
-    return 
-
-	# •	SDK 초기화	•	BLE 연결 / 해제
-	# •	테스트용 계정
-	# •	API 토큰 발급
-	# •	Appium Driver 생성
-	# •	FW / Sampling rate 설정
+    return
  

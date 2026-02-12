@@ -14,6 +14,14 @@ on:
           - read_only
           - writeget_only
           - notify_only
+      device_serial:
+        description: 'BLE 디바이스 시리얼 넘버 (예: 610031)'
+        required: false
+        type: string
+      target_packets:
+        description: '타겟 패킷 수 (장시간 테스트용, 예: 3600=1시간)'
+        required: false
+        type: number
 
   # Schedule - 매일 오전 9시 (KST)
   schedule:
@@ -64,7 +72,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           APPIUM_SERVER_URL: http://localhost:4723/wd/hub
           APPIUM_DEVICE_NAME: ${{ secrets.DEVICE_ID || '55ETQWBXYE1RA1' }}
-          BLE_DEVICE_SERIAL: ${{ secrets.BLE_DEVICE_SERIAL }}
+          BLE_DEVICE_SERIAL: ${{ github.event.inputs.device_serial || secrets.BLE_DEVICE_SERIAL }}
         run: |
           # Stop app first
           adb shell am force-stop com.wellysis.spatch.sdk.sample || true
@@ -80,6 +88,13 @@ jobs:
             TEST_PATH="tests/regression/test_regression.py::TestNotifyScreen"
           fi
 
+          # Add target packets option if specified
+          TARGET_PACKETS_OPTION=""
+          if [ -n "${{ github.event.inputs.target_packets }}" ]; then
+            TARGET_PACKETS_OPTION="--target-packets=${{ github.event.inputs.target_packets }}"
+            echo "🎯 Running with target packets: ${{ github.event.inputs.target_packets }}"
+          fi
+
           # Run tests
           python -m pytest $TEST_PATH \
             -v \
@@ -88,6 +103,7 @@ jobs:
             --json-report \
             --json-report-file=.report.json \
             --tb=short \
+            $TARGET_PACKETS_OPTION \
             || true  # Don't fail workflow on test failure
 
       - name: 📊 Upload test report

@@ -521,7 +521,7 @@ class TestReadScreen:
 class TestDataCollectionWorkflow:
     """Test complete data collection workflow: WriteSet Start/Pause/Restart → Notify → WriteSet Stop/Reset"""
 
-    def test_data_collection_workflow(self, connected_driver):
+    def test_data_collection_workflow(self, connected_driver, target_packets):
         """
         Complete data collection workflow test.
 
@@ -530,14 +530,23 @@ class TestDataCollectionWorkflow:
         2. WriteSet: Pause → Pause measurement
         3. WriteSet: Restart → Resume measurement
         4. Notify: Verify all data streams are active
-        5. WriteSet: Stop → Stop measurement
-        6. WriteSet: Reset Device → Clean up
+        5. [Optional] Monitor ECG packet count until target reached
+        6. WriteSet: Stop → Stop measurement
+        7. WriteSet: Reset Device → Clean up
+
+        Args:
+            target_packets: Optional target packet count for long-term test
+                           (e.g., 3600 for 1 hour, 86400 for 1 day)
         """
         print("\n" + "="*80)
         print("🔬 TEST: Complete Data Collection Workflow")
         print("="*80)
 
         driver = connected_driver
+
+        # Wait for UI to stabilize after connection
+        print("\n⏳ Waiting for UI to stabilize...")
+        time.sleep(3)
 
         # Hide keyboard if present
         try:
@@ -659,8 +668,142 @@ class TestDataCollectionWorkflow:
         else:
             print("✅ All data streams are active!")
 
-        print("⏳ Observing data for 10 seconds...")
-        time.sleep(10)
+        # =================================================================
+        # Optional: Long-term Packet Monitoring
+        # =================================================================
+        if target_packets:
+            print("\n" + "="*80)
+            print(f"📊 PACKET MONITORING: Waiting for {target_packets:,} packets")
+            print("="*80)
+
+            # Calculate estimated time
+            # Assuming 1 packet/second (typical ECG sampling rate)
+            estimated_minutes = target_packets / 60
+            estimated_hours = estimated_minutes / 60
+
+            if estimated_hours >= 1:
+                print(f"⏱️  Estimated time: {estimated_hours:.1f} hours ({estimated_minutes:.0f} minutes)")
+            else:
+                print(f"⏱️  Estimated time: {estimated_minutes:.0f} minutes")
+
+            print("🔍 Monitoring ECG packet count...")
+
+            start_time = time.time()
+            last_log_time = start_time
+            check_interval = 10  # Check every 10 seconds
+
+            current_packets = 0
+            consecutive_failures = 0
+            max_failures = 6  # Allow 6 failures (1 minute) before giving up
+
+            # Scroll to top of Notify screen to ensure Packet Number is visible
+            print("\n📜 Scrolling to top of screen to find Packet Number...")
+            try:
+                for _ in range(3):
+                    driver.execute_script('mobile: scrollGesture', {
+                        'left': 100, 'top': 800, 'width': 500, 'height': 1000,
+                        'direction': 'up',
+                        'percent': 3.0
+                    })
+                    time.sleep(0.5)
+            except:
+                pass
+
+            while current_packets < target_packets:
+                try:
+                    # Find "Packet Number" element and extract count
+                    packet_text = None
+                    extraction_method = None
+
+                    # Pattern 1: Find element containing "Packet Number :" (more specific)
+                    try:
+                        packet_element = driver.find_element(
+                            AppiumBy.XPATH,
+                            "//*[contains(@text, 'Packet Number :')]"
+                        )
+                        packet_text = packet_element.text
+                        extraction_method = "contains-colon"
+                        print(f"🔍 [DEBUG] Found via 'Packet Number :': '{packet_text}'")
+                    except Exception as e1:
+                        # Pattern 2: Find element with manual search through all TextViews
+                        try:
+                            # Get all TextViews and search manually
+                            all_texts = driver.find_elements(AppiumBy.CLASS_NAME, "android.widget.TextView")
+                            for elem in all_texts:
+                                try:
+                                    text = elem.text
+                                    if text and ('Packet Number' in text or 'packet number' in text.lower()):
+                                        packet_text = text
+                                        extraction_method = "manual-search"
+                                        print(f"🔍 [DEBUG] Found via manual search: '{packet_text}'")
+                                        break
+                                except:
+                                    continue
+
+                            if not packet_text:
+                                raise Exception("Packet Number not found in any TextView")
+                        except Exception as e2:
+                            print(f"❌ [DEBUG] Both XPath methods failed")
+                            print(f"   Method 1: {str(e1)[:80]}")
+                            print(f"   Method 2: {str(e2)[:80]}")
+                            consecutive_failures += 1
+                            if consecutive_failures >= max_failures:
+                                print(f"\n⚠️  Too many failures ({consecutive_failures}), stopping packet monitoring")
+                                break
+
+                    # Extract packet count from text
+                    if packet_text:
+                        consecutive_failures = 0  # Reset failure counter
+
+                        # Use regex to extract ONLY the packet number from "Packet Number: XXX"
+                        # This avoids getting confused by sample data that follows
+                        match = re.search(r'Packet Number:\s*(\d+)', packet_text, re.IGNORECASE)
+
+                        if match:
+                            prev_packets = current_packets
+                            current_packets = int(match.group(1))
+                            print(f"📦 [DEBUG] Packet count: {prev_packets} → {current_packets} (target: {target_packets})")
+
+                            # Log progress every minute
+                            current_time = time.time()
+                            if current_time - last_log_time >= 60:
+                                elapsed = (current_time - start_time) / 60
+                                progress = (current_packets / target_packets) * 100
+                                remaining = target_packets - current_packets
+                                eta_minutes = (remaining / (current_packets / (elapsed + 0.001)))
+
+                                print(f"\n📊 Progress: {current_packets:,}/{target_packets:,} packets ({progress:.1f}%)")
+                                print(f"   Elapsed: {elapsed:.1f} min | ETA: {eta_minutes:.1f} min\n")
+                                last_log_time = current_time
+                        else:
+                            print(f"⚠️  [DEBUG] Could not parse packet number from text (first 100 chars): '{packet_text[:100]}...'")
+
+                    # Check if target reached
+                    print(f"🎯 [DEBUG] Checking: {current_packets} >= {target_packets}? {current_packets >= target_packets}")
+                    if current_packets >= target_packets:
+                        total_time = (time.time() - start_time) / 60
+                        print(f"\n{'='*80}")
+                        print(f"✅ Target reached: {current_packets:,} packets in {total_time:.1f} minutes!")
+                        print(f"{'='*80}\n")
+                        break
+
+                    # Wait before next check
+                    time.sleep(check_interval)
+
+                except Exception as e:
+                    print(f"⚠️  Error reading packet count: {e}")
+                    consecutive_failures += 1
+                    if consecutive_failures >= max_failures:
+                        print(f"\n⚠️  Too many failures ({consecutive_failures}), stopping packet monitoring")
+                        break
+                    time.sleep(check_interval)
+
+            driver.save_screenshot('step4_notify_target_reached.png')
+            print("✅ Packet monitoring complete!")
+        else:
+            # Default: Just observe for 10 seconds
+            print("⏳ Observing data for 10 seconds...")
+            time.sleep(10)
 
         driver.save_screenshot('step4_notify_active_data.png')
         print("✅ STEP 4 Complete - Data Streams Verified")
