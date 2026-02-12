@@ -1,0 +1,17 @@
+# Core testing framework
+pytest==8.0.0
+pytest-html==4.1.1
+pytest-json-report==1.5.0
+pytest-timeout==2.2.0
+
+# Appium and Selenium
+Appium-Python-Client==3.1.1
+selenium==4.17.2
+
+# Utilities
+python-dotenv==1.0.1
+requests==2.31.0
+packaging==24.0
+
+# Logging
+colorlog==6.8.2
