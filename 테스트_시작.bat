@@ -8,15 +8,14 @@ echo ============================================================
 echo 🚀 SDK 검증 테스트
 echo ============================================================
 echo.
-echo GUI 앱을 시작합니다...
-echo.
 
-if exist "standalone_gui.py" (
-    python standalone_gui.py
-) else if exist "gui_test_runner.py" (
-    python gui_test_runner.py
+REM 전체 테스트 스위트 실행
+if exist "scripts\run_full_test_suite.sh" (
+    echo 전체 테스트 스위트를 실행합니다...
+    echo.
+    bash scripts/run_full_test_suite.sh
 ) else (
-    echo ❌ GUI 앱을 찾을 수 없습니다.
+    echo ❌ 테스트 스크립트를 찾을 수 없습니다.
     echo.
     pause
 )
