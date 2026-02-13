@@ -12,10 +12,8 @@ echo ""
 echo "GUI 앱을 실행합니다..."
 echo ""
 
-# GUI 앱 실행
-if [ -f "gui_test_runner.py" ]; then
-    python3 gui_test_runner.py
-elif [ -f "standalone_gui.py" ]; then
+# GUI 앱 실행 (Appium 불필요한 standalone 버전)
+if [ -f "standalone_gui.py" ]; then
     python3 standalone_gui.py
 else
     echo "❌ GUI 앱을 찾을 수 없습니다."

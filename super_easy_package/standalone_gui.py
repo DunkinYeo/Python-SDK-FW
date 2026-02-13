@@ -31,6 +31,7 @@ class StandaloneTestRunner:
         self.target_packets = tk.StringVar(value="60")
         self.run_packet_test = tk.BooleanVar(value=False)
         self.is_running = False
+        self.process = None
         self.android_device = None
 
         self.setup_ui()
@@ -361,7 +362,10 @@ class StandaloneTestRunner:
         self.root.update()
 
     def start_test(self):
-        """Start the test."""
+        """Start the test in a separate thread."""
+        if self.is_running:
+            return
+
         if not self.android_device:
             messagebox.showerror("오류", "Android 디바이스가 연결되지 않았습니다.")
             return
@@ -370,18 +374,250 @@ class StandaloneTestRunner:
             messagebox.showerror("오류", "BLE 디바이스 시리얼 넘버를 입력하세요")
             return
 
-        response = messagebox.showinfo(
-            "테스트 시작",
-            "✅ 현재 기본 테스트만 지원합니다.\n\n"
-            "전체 테스트를 실행하려면 기존 스크립트를 사용하세요:\n"
-            "./scripts/run_full_test_suite.sh\n\n"
-            "또는 원래 GUI 앱을 사용하세요:\n"
-            "python gui_test_runner.py"
+        if self.run_packet_test.get():
+            try:
+                packets = int(self.target_packets.get())
+                if packets <= 0:
+                    raise ValueError()
+            except:
+                messagebox.showerror("오류", "올바른 타겟 패킷 수를 입력하세요")
+                return
+
+        # Update UI
+        self.is_running = True
+        self.start_button.config(state=tk.DISABLED)
+        self.stop_button.config(state=tk.NORMAL)
+        self.progress.start()
+        self.log_text.delete(1.0, tk.END)
+        self.update_status("테스트 실행 중...", "blue")
+
+        # Save device serial to .env
+        self.save_device_serial()
+
+        # Start test in thread
+        test_thread = threading.Thread(target=self.run_test, daemon=True)
+        test_thread.start()
+
+    def save_device_serial(self):
+        """Save device serial to .env file."""
+        env_file = Path(".env")
+        if env_file.exists():
+            content = env_file.read_text()
+            if "BLE_DEVICE_SERIAL=" in content:
+                # Update existing
+                lines = content.split('\n')
+                for i, line in enumerate(lines):
+                    if line.startswith("BLE_DEVICE_SERIAL="):
+                        lines[i] = f"BLE_DEVICE_SERIAL={self.device_serial.get()}"
+                env_file.write_text('\n'.join(lines))
+            else:
+                # Append new
+                with open(env_file, 'a') as f:
+                    f.write(f"\nBLE_DEVICE_SERIAL={self.device_serial.get()}\n")
+
+    def run_test(self):
+        """Run the actual test."""
+        try:
+            # Force stop app
+            self.log("🛑 앱 강제 종료 중...\n")
+            subprocess.run(
+                ["adb", "shell", "am", "force-stop", "com.wellysis.spatch.sdk.sample"],
+                capture_output=True
+            )
+            time.sleep(2)
+
+            # Check if packet monitoring test is requested
+            if self.run_packet_test.get():
+                # Show manual reset instructions
+                self.root.after(0, self.show_reset_instructions)
+                return
+
+            # Build pytest command
+            self.log("\n🧪 테스트 실행 중...\n", "blue")
+            cmd = [
+                sys.executable, "-m", "pytest",
+                "tests/regression/test_regression.py",
+                "-v",
+                "--html=test-report.html",
+                "--self-contained-html",
+                "--json-report",
+                "--json-report-file=.report.json",
+                "--tb=short"
+            ]
+
+            if self.run_packet_test.get():
+                cmd.append(f"--target-packets={self.target_packets.get()}")
+
+            # Run pytest
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+
+            # Stream output
+            for line in self.process.stdout:
+                if not self.is_running:
+                    break
+                self.root.after(0, self.log, line)
+
+            self.process.wait()
+
+            # Check result
+            if self.process.returncode == 0:
+                self.root.after(0, self.test_completed, True)
+            else:
+                self.root.after(0, self.test_completed, False)
+
+        except Exception as e:
+            self.root.after(0, self.test_failed, str(e))
+
+    def show_reset_instructions(self):
+        """Show device reset instructions for packet monitoring test."""
+        self.progress.stop()
+        result = messagebox.askyesno(
+            "디바이스 초기화 필요",
+            "패킷 모니터링 테스트를 시작하기 전에:\n\n"
+            "1. 앱에서 WriteSet → STOP 클릭\n"
+            "2. WriteSet → RESET DEVICE 클릭\n"
+            "3. Packet Number가 0으로 초기화되었는지 확인\n\n"
+            "초기화를 완료하셨습니까?"
         )
 
+        if result:
+            self.progress.start()
+            # Continue with test
+            test_thread = threading.Thread(target=self.run_test_after_reset, daemon=True)
+            test_thread.start()
+        else:
+            self.is_running = False
+            self.start_button.config(state=tk.NORMAL)
+            self.stop_button.config(state=tk.DISABLED)
+            self.update_status("테스트 취소됨", "orange")
+            self.log("\n❌ 테스트가 취소되었습니다.\n", "red")
+
+    def run_test_after_reset(self):
+        """Run test after manual reset is confirmed."""
+        try:
+            self.log("\n🧪 테스트 실행 중...\n", "blue")
+            cmd = [
+                sys.executable, "-m", "pytest",
+                "tests/regression/test_regression.py",
+                "-v",
+                "--html=test-report.html",
+                "--self-contained-html",
+                "--json-report",
+                "--json-report-file=.report.json",
+                "--tb=short",
+                f"--target-packets={self.target_packets.get()}"
+            ]
+
+            # Run pytest
+            self.process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+
+            # Stream output
+            for line in self.process.stdout:
+                if not self.is_running:
+                    break
+                self.root.after(0, self.log, line)
+
+            self.process.wait()
+
+            # Check result
+            if self.process.returncode == 0:
+                self.root.after(0, self.test_completed, True)
+            else:
+                self.root.after(0, self.test_completed, False)
+
+        except Exception as e:
+            self.root.after(0, self.test_failed, str(e))
+
+    def test_completed(self, success):
+        """Handle test completion."""
+        self.is_running = False
+        self.progress.stop()
+        self.start_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
+
+        if success:
+            self.update_status("✅ 테스트 완료!", "green")
+            self.log("\n✅ 모든 테스트가 성공적으로 완료되었습니다!\n", "green")
+
+            # Send Slack notification
+            self.send_slack_notification()
+
+            # Open HTML report
+            self.log("\n📊 HTML 리포트를 여는 중...\n")
+            report_path = Path("test-report.html").absolute()
+            if report_path.exists():
+                webbrowser.open(f"file://{report_path}")
+
+            messagebox.showinfo(
+                "테스트 완료",
+                "✅ 모든 테스트가 성공적으로 완료되었습니다!\n\n"
+                "- HTML 리포트가 브라우저에서 열립니다\n"
+                "- Slack 알림이 전송되었습니다"
+            )
+        else:
+            self.update_status("❌ 테스트 실패", "red")
+            self.log("\n❌ 일부 테스트가 실패했습니다.\n", "red")
+            self.send_slack_notification()
+            messagebox.showwarning(
+                "테스트 실패",
+                "❌ 일부 테스트가 실패했습니다.\n\n"
+                "상세 내용은 로그와 HTML 리포트를 확인하세요."
+            )
+
+    def test_failed(self, error):
+        """Handle test failure."""
+        self.is_running = False
+        self.progress.stop()
+        self.start_button.config(state=tk.NORMAL)
+        self.stop_button.config(state=tk.DISABLED)
+        self.update_status("❌ 오류 발생", "red")
+        self.log(f"\n❌ 오류: {error}\n", "red")
+        messagebox.showerror("오류", f"테스트 실행 중 오류가 발생했습니다:\n\n{error}")
+
+    def send_slack_notification(self):
+        """Send Slack notification."""
+        try:
+            self.log("\n📤 Slack 알림 전송 중...\n")
+            result = subprocess.run(
+                [sys.executable, "scripts/send_slack_notification.py"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                self.log("✅ Slack 알림이 전송되었습니다.\n", "green")
+            else:
+                self.log("⚠️ Slack 알림 전송 실패\n", "orange")
+        except Exception as e:
+            self.log(f"⚠️ Slack 알림 전송 중 오류: {e}\n", "orange")
+
     def stop_test(self):
-        """Stop the test."""
-        pass
+        """Stop the running test."""
+        if self.is_running and self.process:
+            result = messagebox.askyesno(
+                "테스트 중지",
+                "실행 중인 테스트를 중지하시겠습니까?"
+            )
+            if result:
+                self.is_running = False
+                self.process.terminate()
+                self.progress.stop()
+                self.start_button.config(state=tk.NORMAL)
+                self.stop_button.config(state=tk.DISABLED)
+                self.update_status("테스트 중지됨", "orange")
+                self.log("\n⚠️ 테스트가 사용자에 의해 중지되었습니다.\n", "orange")
 
 
 def main():

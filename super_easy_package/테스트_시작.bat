@@ -11,10 +11,8 @@ echo.
 echo GUI 앱을 실행합니다...
 echo.
 
-REM GUI 앱 실행
-if exist "gui_test_runner.py" (
-    python gui_test_runner.py
-) else if exist "standalone_gui.py" (
+REM GUI 앱 실행 (Appium 불필요한 standalone 버전)
+if exist "standalone_gui.py" (
     python standalone_gui.py
 ) else (
     echo ❌ GUI 앱을 찾을 수 없습니다.
