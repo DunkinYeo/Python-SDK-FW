@@ -46,7 +46,7 @@ class StandaloneTestRunner:
 
         header_label = tk.Label(
             header_frame,
-            text="🚀 SDK 검증 테스트",
+            text="✅ SDK 검증 테스트",
             font=("Arial", 20, "bold"),
             bg="#2196F3",
             fg="white"
@@ -55,7 +55,7 @@ class StandaloneTestRunner:
 
         subtitle_label = tk.Label(
             header_frame,
-            text="Appium 서버 불필요 | Python + ADB만 있으면 OK",
+            text="단 두번의 클릭만으로 테스트 완료",
             font=("Arial", 10),
             bg="#2196F3",
             fg="white"
