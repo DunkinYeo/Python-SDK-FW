@@ -79,14 +79,57 @@ echo "✅ 모든 프로그램 설치 완료!"
 
 echo ""
 
-# 4. Android 디바이스 확인
-echo "4️⃣  Android 디바이스 확인..."
+# 4. SDK 검증 앱 APK 다운로드 및 설치
+echo "4️⃣  SDK 검증 앱 다운로드 및 설치 중..."
+APK_FILE="automation-sdk2.1.5.apk"
+APK_URL="https://github.com/DunkinYeo/Python-SDK-FW/releases/download/sdk-app-v2.1.5/automation-sdk2.1.5.apk"
+
+if [ ! -f "$APK_FILE" ]; then
+    echo "📥 SDK 검증 앱 다운로드 중... (약 63MB)"
+    if command -v curl &> /dev/null; then
+        curl -L -o "$APK_FILE" "$APK_URL" --progress-bar
+    elif command -v wget &> /dev/null; then
+        wget -O "$APK_FILE" "$APK_URL"
+    else
+        echo "❌ curl 또는 wget이 필요합니다."
+        echo "수동으로 다운로드하세요: $APK_URL"
+        open "$APK_URL"
+        read -p "다운로드 후 아무 키나 누르세요..."
+    fi
+
+    if [ -f "$APK_FILE" ]; then
+        echo "✅ APK 다운로드 완료!"
+    else
+        echo "❌ APK 다운로드 실패"
+    fi
+else
+    echo "✅ SDK 검증 앱 APK 파일 존재"
+fi
+
+echo ""
+
+# 5. Android 디바이스 확인
+echo "5️⃣  Android 디바이스 확인..."
 adb devices
 
 DEVICE_COUNT=$(adb devices | grep -w "device" | wc -l | tr -d ' ')
 
 if [ "$DEVICE_COUNT" -gt 0 ]; then
     echo "✅ Android 디바이스가 연결되어 있습니다!"
+    echo ""
+
+    # APK 자동 설치
+    if [ -f "$APK_FILE" ]; then
+        echo "6️⃣  SDK 검증 앱 설치 중..."
+        adb install -r "$APK_FILE"
+
+        if [ $? -eq 0 ]; then
+            echo "✅ SDK 검증 앱 설치 완료!"
+        else
+            echo "⚠️  앱 설치 중 문제가 발생했습니다."
+            echo "   수동으로 설치해주세요: $APK_FILE"
+        fi
+    fi
 else
     echo "⚠️  연결된 Android 디바이스가 없습니다."
     echo ""
@@ -96,6 +139,9 @@ else
     echo "USB 디버깅 활성화 방법:"
     echo "1. 설정 > 휴대전화 정보 > 빌드 번호 7번 탭"
     echo "2. 설정 > 개발자 옵션 > USB 디버깅 활성화"
+    echo ""
+    echo "디바이스 연결 후 이 프로그램을 다시 실행하면"
+    echo "SDK 검증 앱이 자동으로 설치됩니다."
 fi
 
 echo ""
