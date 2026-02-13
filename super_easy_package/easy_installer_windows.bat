@@ -32,28 +32,55 @@ python --version
 echo ✅ Python 설치됨
 echo.
 
-REM 2. ADB 확인
+REM 2. ADB 확인 및 자동 설치
 echo 2️⃣  ADB (Android Debug Bridge) 확인 중...
 adb version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo ⚠️  ADB가 설치되어 있지 않습니다.
     echo.
-    echo 자동으로 Platform Tools 다운로드 페이지를 엽니다...
-    timeout /t 2 >nul
-    start https://developer.android.com/studio/releases/platform-tools
-    echo.
-    echo === ADB 설치 방법 ===
-    echo 1. 다운로드한 ZIP 파일을 압축 해제
-    echo 2. platform-tools 폴더를 C:\ 드라이브에 복사
-    echo 3. 시스템 환경 변수 PATH에 C:\platform-tools 추가
-    echo.
-    echo 설치 방법을 모르시면 관리자에게 문의하세요.
-    echo.
-    pause
-    exit /b 1
+
+    REM 로컬 platform-tools 확인
+    if exist "platform-tools\adb.exe" (
+        echo ✅ 로컬 ADB 발견
+        set "PATH=%CD%\platform-tools;%PATH%"
+    ) else (
+        echo 📥 ADB 자동 다운로드 및 설치 중... (약 10MB^)
+        echo    (시간이 조금 걸릴 수 있습니다...^)
+        echo.
+
+        REM Platform Tools 다운로드
+        curl -L -o platform-tools.zip https://dl.google.com/android/repository/platform-tools-latest-windows.zip
+
+        if exist "platform-tools.zip" (
+            echo 📦 압축 해제 중...
+
+            REM PowerShell로 압축 해제
+            powershell -Command "Expand-Archive -Path platform-tools.zip -DestinationPath . -Force"
+
+            REM ZIP 파일 삭제
+            del platform-tools.zip
+
+            if exist "platform-tools\adb.exe" (
+                echo ✅ ADB 자동 설치 완료!
+                set "PATH=%CD%\platform-tools;%PATH%"
+            ) else (
+                echo ❌ 자동 설치 실패
+                echo 수동으로 설치해주세요.
+                start https://developer.android.com/studio/releases/platform-tools
+                pause
+                exit /b 1
+            )
+        ) else (
+            echo ❌ 다운로드 실패
+            start https://developer.android.com/studio/releases/platform-tools
+            pause
+            exit /b 1
+        )
+    )
+) else (
+    echo ✅ ADB 설치됨
 )
 
-echo ✅ ADB 설치됨
 echo.
 
 REM 3. Python 패키지 설치
