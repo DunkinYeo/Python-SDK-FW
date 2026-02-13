@@ -11,9 +11,17 @@ echo.
 echo GUI 앱을 실행합니다...
 echo.
 
+REM Python 경로 설정
+if exist "python-embed\python.exe" (
+    set "PYTHON_CMD=%CD%\python-embed\python.exe"
+    set "PATH=%CD%\python-embed;%CD%\python-embed\Scripts;%PATH%"
+) else (
+    set "PYTHON_CMD=python"
+)
+
 REM GUI 앱 실행 (Appium 불필요한 standalone 버전)
 if exist "standalone_gui.py" (
-    python standalone_gui.py
+    %PYTHON_CMD% standalone_gui.py
 ) else (
     echo ❌ GUI 앱을 찾을 수 없습니다.
     echo.

@@ -10,26 +10,74 @@ echo.
 echo 자동으로 모든 설정을 진행합니다...
 echo.
 
-REM 1. Python 확인
+REM 1. Python 확인 및 자동 설치
 echo 1️⃣  Python 확인 중...
 python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo ❌ Python이 설치되어 있지 않습니다.
+    echo ⚠️  Python이 설치되어 있지 않습니다.
     echo.
-    echo 자동으로 Python 다운로드 페이지를 엽니다...
-    timeout /t 2 >nul
-    start https://www.python.org/downloads/
-    echo.
-    echo Python 설치 후 이 프로그램을 다시 실행하세요.
-    echo.
-    echo 💡 설치 시 "Add Python to PATH" 옵션을 꼭 체크하세요!
-    echo.
-    pause
-    exit /b 1
+
+    REM 로컬 Python 확인
+    if exist "python-embed\python.exe" (
+        echo ✅ 로컬 Python 발견
+        set "PYTHON_CMD=%CD%\python-embed\python.exe"
+        set "PATH=%CD%\python-embed;%CD%\python-embed\Scripts;%PATH%"
+    ) else (
+        echo 📥 Python 자동 다운로드 및 설치 중... (약 10MB^)
+        echo    (시간이 조금 걸릴 수 있습니다...^)
+        echo.
+
+        REM Python Embeddable 다운로드
+        curl -L -o python-embed.zip https://www.python.org/ftp/python/3.11.8/python-3.11.8-embed-amd64.zip
+
+        if exist "python-embed.zip" (
+            echo 📦 압축 해제 중...
+
+            REM PowerShell로 압축 해제
+            powershell -Command "Expand-Archive -Path python-embed.zip -DestinationPath python-embed -Force"
+
+            REM ZIP 파일 삭제
+            del python-embed.zip
+
+            if exist "python-embed\python.exe" (
+                echo ✅ Python 압축 해제 완료!
+
+                REM pip 활성화를 위한 pth 파일 수정
+                echo import site > python-embed\python311._pth
+
+                REM get-pip.py 다운로드
+                echo 📥 pip 설치 중...
+                curl -L -o python-embed\get-pip.py https://bootstrap.pypa.io/get-pip.py
+
+                REM pip 설치
+                python-embed\python.exe python-embed\get-pip.py --quiet
+
+                REM get-pip.py 삭제
+                del python-embed\get-pip.py
+
+                echo ✅ Python 자동 설치 완료!
+                set "PYTHON_CMD=%CD%\python-embed\python.exe"
+                set "PATH=%CD%\python-embed;%CD%\python-embed\Scripts;%PATH%"
+            ) else (
+                echo ❌ 자동 설치 실패
+                echo 수동으로 설치해주세요.
+                start https://www.python.org/downloads/
+                pause
+                exit /b 1
+            )
+        ) else (
+            echo ❌ 다운로드 실패
+            start https://www.python.org/downloads/
+            pause
+            exit /b 1
+        )
+    )
+) else (
+    set "PYTHON_CMD=python"
 )
 
-python --version
-echo ✅ Python 설치됨
+%PYTHON_CMD% --version
+echo ✅ Python 사용 가능
 echo.
 
 REM 2. ADB 확인 및 자동 설치
@@ -88,9 +136,9 @@ echo 3️⃣  필요한 프로그램 설치 중...
 echo    (시간이 조금 걸릴 수 있습니다...)
 echo.
 
-python -m pip install --upgrade pip --quiet
-python -m pip install -r requirements.txt --quiet
-python -m pip install uiautomator2 adbutils --quiet
+%PYTHON_CMD% -m pip install --upgrade pip --quiet
+%PYTHON_CMD% -m pip install -r requirements.txt --quiet
+%PYTHON_CMD% -m pip install uiautomator2 adbutils --quiet
 
 echo ✅ 모든 프로그램 설치 완료!
 echo.
