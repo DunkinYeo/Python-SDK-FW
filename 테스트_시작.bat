@@ -5,17 +5,19 @@ TITLE SDK 검증 테스트
 
 color 0B
 echo ============================================================
-echo 🚀 SDK 검증 테스트
+echo 🚀 SDK 검증 테스트 - GUI 앱 시작
 echo ============================================================
 echo.
+echo GUI 앱을 실행합니다...
+echo.
 
-REM 전체 테스트 스위트 실행
-if exist "scripts\run_full_test_suite.sh" (
-    echo 전체 테스트 스위트를 실행합니다...
-    echo.
-    bash scripts/run_full_test_suite.sh
+REM GUI 앱 실행
+if exist "gui_test_runner.py" (
+    python gui_test_runner.py
+) else if exist "standalone_gui.py" (
+    python standalone_gui.py
 ) else (
-    echo ❌ 테스트 스크립트를 찾을 수 없습니다.
+    echo ❌ GUI 앱을 찾을 수 없습니다.
     echo.
     pause
 )

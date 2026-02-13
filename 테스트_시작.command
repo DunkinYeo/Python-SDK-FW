@@ -6,17 +6,19 @@ cd "$(dirname "$0")"
 
 clear
 echo "============================================================"
-echo "🚀 SDK 검증 테스트"
+echo "🚀 SDK 검증 테스트 - GUI 앱 시작"
 echo "============================================================"
 echo ""
+echo "GUI 앱을 실행합니다..."
+echo ""
 
-# 전체 테스트 스위트 실행
-if [ -f "scripts/run_full_test_suite.sh" ]; then
-    echo "전체 테스트 스위트를 실행합니다..."
-    echo ""
-    bash scripts/run_full_test_suite.sh
+# GUI 앱 실행
+if [ -f "gui_test_runner.py" ]; then
+    python3 gui_test_runner.py
+elif [ -f "standalone_gui.py" ]; then
+    python3 standalone_gui.py
 else
-    echo "❌ 테스트 스크립트를 찾을 수 없습니다."
+    echo "❌ GUI 앱을 찾을 수 없습니다."
     echo ""
     read -p "아무 키나 누르면 종료됩니다..."
 fi
