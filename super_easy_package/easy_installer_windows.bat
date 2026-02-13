@@ -4,26 +4,26 @@ TITLE SDK 검증 테스트 - 자동 설치
 
 color 0A
 echo ============================================================
-echo 🚀 SDK 검증 테스트 - 완전 자동 설치
+echo SDK 검증 테스트 - 완전 자동 설치
 echo ============================================================
 echo.
 echo 자동으로 모든 설정을 진행합니다...
 echo.
 
 REM 1. Python 확인 및 자동 설치
-echo 1️⃣  Python 확인 중...
+echo [1/4] Python 확인 중...
 python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo ⚠️  Python이 설치되어 있지 않습니다.
+    echo [!] Python이 설치되어 있지 않습니다.
     echo.
 
     REM 로컬 Python 확인
     if exist "python-embed\python.exe" (
-        echo ✅ 로컬 Python 발견
+        echo [OK] 로컬 Python 발견
         set "PYTHON_CMD=%CD%\python-embed\python.exe"
         set "PATH=%CD%\python-embed;%CD%\python-embed\Scripts;%PATH%"
     ) else (
-        echo 📥 Python 자동 다운로드 및 설치 중... (약 10MB^)
+        echo [Download] Python 자동 다운로드 및 설치 중... (약 10MB^)
         echo    (시간이 조금 걸릴 수 있습니다...^)
         echo.
 
@@ -31,7 +31,7 @@ if %ERRORLEVEL% NEQ 0 (
         curl -L -o python-embed.zip https://www.python.org/ftp/python/3.11.8/python-3.11.8-embed-amd64.zip
 
         if exist "python-embed.zip" (
-            echo 📦 압축 해제 중...
+            echo [Extract] 압축 해제 중...
 
             REM PowerShell로 압축 해제
             powershell -Command "Expand-Archive -Path python-embed.zip -DestinationPath python-embed -Force"
@@ -40,13 +40,13 @@ if %ERRORLEVEL% NEQ 0 (
             del python-embed.zip
 
             if exist "python-embed\python.exe" (
-                echo ✅ Python 압축 해제 완료!
+                echo [OK] Python 압축 해제 완료!
 
                 REM pip 활성화를 위한 pth 파일 수정
                 echo import site > python-embed\python311._pth
 
                 REM get-pip.py 다운로드
-                echo 📥 pip 설치 중...
+                echo [Download] pip 설치 중...
                 curl -L -o python-embed\get-pip.py https://bootstrap.pypa.io/get-pip.py
 
                 REM pip 설치
@@ -55,18 +55,18 @@ if %ERRORLEVEL% NEQ 0 (
                 REM get-pip.py 삭제
                 del python-embed\get-pip.py
 
-                echo ✅ Python 자동 설치 완료!
+                echo [OK] Python 자동 설치 완료!
                 set "PYTHON_CMD=%CD%\python-embed\python.exe"
                 set "PATH=%CD%\python-embed;%CD%\python-embed\Scripts;%PATH%"
             ) else (
-                echo ❌ 자동 설치 실패
+                echo [ERROR] 자동 설치 실패
                 echo 수동으로 설치해주세요.
                 start https://www.python.org/downloads/
                 pause
                 exit /b 1
             )
         ) else (
-            echo ❌ 다운로드 실패
+            echo [ERROR] 다운로드 실패
             start https://www.python.org/downloads/
             pause
             exit /b 1
@@ -77,22 +77,22 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 %PYTHON_CMD% --version
-echo ✅ Python 사용 가능
+echo [OK] Python 사용 가능
 echo.
 
 REM 2. ADB 확인 및 자동 설치
-echo 2️⃣  ADB (Android Debug Bridge) 확인 중...
+echo [2/5] ADB (Android Debug Bridge) 확인 중...
 adb version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo ⚠️  ADB가 설치되어 있지 않습니다.
+    echo [!]  ADB가 설치되어 있지 않습니다.
     echo.
 
     REM 로컬 platform-tools 확인
     if exist "platform-tools\adb.exe" (
-        echo ✅ 로컬 ADB 발견
+        echo [OK] 로컬 ADB 발견
         set "PATH=%CD%\platform-tools;%PATH%"
     ) else (
-        echo 📥 ADB 자동 다운로드 및 설치 중... (약 10MB^)
+        echo [Download] ADB 자동 다운로드 및 설치 중... (약 10MB^)
         echo    (시간이 조금 걸릴 수 있습니다...^)
         echo.
 
@@ -100,7 +100,7 @@ if %ERRORLEVEL% NEQ 0 (
         curl -L -o platform-tools.zip https://dl.google.com/android/repository/platform-tools-latest-windows.zip
 
         if exist "platform-tools.zip" (
-            echo 📦 압축 해제 중...
+            echo [Extract] 압축 해제 중...
 
             REM PowerShell로 압축 해제
             powershell -Command "Expand-Archive -Path platform-tools.zip -DestinationPath . -Force"
@@ -109,30 +109,30 @@ if %ERRORLEVEL% NEQ 0 (
             del platform-tools.zip
 
             if exist "platform-tools\adb.exe" (
-                echo ✅ ADB 자동 설치 완료!
+                echo [OK] ADB 자동 설치 완료!
                 set "PATH=%CD%\platform-tools;%PATH%"
             ) else (
-                echo ❌ 자동 설치 실패
+                echo [ERROR] 자동 설치 실패
                 echo 수동으로 설치해주세요.
                 start https://developer.android.com/studio/releases/platform-tools
                 pause
                 exit /b 1
             )
         ) else (
-            echo ❌ 다운로드 실패
+            echo [ERROR] 다운로드 실패
             start https://developer.android.com/studio/releases/platform-tools
             pause
             exit /b 1
         )
     )
 ) else (
-    echo ✅ ADB 설치됨
+    echo [OK] ADB 설치됨
 )
 
 echo.
 
 REM 3. Python 패키지 설치
-echo 3️⃣  필요한 프로그램 설치 중...
+echo [3/5] 필요한 프로그램 설치 중...
 echo    (시간이 조금 걸릴 수 있습니다...)
 echo.
 
@@ -140,57 +140,57 @@ echo.
 %PYTHON_CMD% -m pip install -r requirements.txt --quiet
 %PYTHON_CMD% -m pip install uiautomator2 adbutils --quiet
 
-echo ✅ 모든 프로그램 설치 완료!
+echo [OK] 모든 프로그램 설치 완료!
 echo.
 
 REM 4. SDK 검증 앱 APK 다운로드 및 설치
-echo 4️⃣  SDK 검증 앱 다운로드 및 설치 중...
+echo [4/5] SDK 검증 앱 다운로드 및 설치 중...
 set APK_FILE=automation-sdk2.1.5.apk
 set APK_URL=https://github.com/DunkinYeo/Python-SDK-FW/releases/download/sdk-app-v2.1.5/automation-sdk2.1.5.apk
 
 if not exist "%APK_FILE%" (
-    echo 📥 SDK 검증 앱 다운로드 중... (약 63MB^)
+    echo [Download] SDK 검증 앱 다운로드 중... (약 63MB^)
     curl -L -o "%APK_FILE%" "%APK_URL%"
 
     if exist "%APK_FILE%" (
-        echo ✅ APK 다운로드 완료!
+        echo [OK] APK 다운로드 완료!
     ) else (
-        echo ❌ APK 다운로드 실패
+        echo [ERROR] APK 다운로드 실패
         echo 수동으로 다운로드하세요: %APK_URL%
         start %APK_URL%
     )
 ) else (
-    echo ✅ SDK 검증 앱 APK 파일 존재
+    echo [OK] SDK 검증 앱 APK 파일 존재
 )
 
 echo.
 
 REM 5. Android 디바이스 확인 및 APK 설치
-echo 5️⃣  Android 디바이스 확인...
+echo [5/5] Android 디바이스 확인...
 adb devices
 
 REM 연결된 디바이스 수 확인
 adb devices | find "device" >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
-    echo ✅ Android 디바이스가 연결되어 있습니다!
+    echo [OK] Android 디바이스가 연결되어 있습니다!
     echo.
 
     REM APK 자동 설치
     if exist "%APK_FILE%" (
-        echo 6️⃣  SDK 검증 앱 설치 중...
+        echo [6/6] SDK 검증 앱 설치 중...
         adb install -r "%APK_FILE%"
 
         if %ERRORLEVEL% EQU 0 (
-            echo ✅ SDK 검증 앱 설치 완료!
+            echo [OK] SDK 검증 앱 설치 완료!
         ) else (
-            echo ⚠️  앱 설치 중 문제가 발생했습니다.
+            echo [!]  앱 설치 중 문제가 발생했습니다.
             echo    수동으로 설치해주세요: %APK_FILE%
         )
     )
 ) else (
-    echo ⚠️  연결된 Android 디바이스가 없습니다.
+    echo [!]  연결된 Android 디바이스가 없습니다.
     echo.
-    echo 📱 Android 디바이스를 USB로 연결하고,
+    echo [!] Android 디바이스를 USB로 연결하고,
     echo    USB 디버깅을 활성화해주세요.
     echo.
     echo USB 디버깅 활성화 방법:
@@ -203,7 +203,7 @@ if %ERRORLEVEL% EQU 0 (
 
 echo.
 echo ============================================================
-echo ✅ 설치 완료!
+echo [OK] 설치 완료!
 echo ============================================================
 echo.
 echo 이제 '테스트_시작.bat' 파일을 더블클릭하여

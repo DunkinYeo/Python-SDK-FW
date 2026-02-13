@@ -418,6 +418,12 @@ class StandaloneTestRunner:
     def run_test(self):
         """Run the actual test."""
         try:
+            # Delete old test report to prevent corruption
+            old_report = Path("test-report.html")
+            if old_report.exists():
+                self.log("🗑️ 이전 리포트 삭제 중...\n")
+                old_report.unlink()
+
             # Force stop app
             self.log("🛑 앱 강제 종료 중...\n")
             subprocess.run(
@@ -501,6 +507,12 @@ class StandaloneTestRunner:
     def run_test_after_reset(self):
         """Run test after manual reset is confirmed."""
         try:
+            # Delete old test report to prevent corruption
+            old_report = Path("test-report.html")
+            if old_report.exists():
+                self.log("🗑️ 이전 리포트 삭제 중...\n")
+                old_report.unlink()
+
             self.log("\n🧪 테스트 실행 중...\n", "blue")
             cmd = [
                 sys.executable, "-m", "pytest",
