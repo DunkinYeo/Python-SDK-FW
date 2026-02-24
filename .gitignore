@@ -41,3 +41,13 @@ appium.log
 .DS_Store
 Thumbs.db
 apk-analysis/
+
+# Buildozer (Android APK build)
+mobile_app/.buildozer/
+mobile_app/bin/
+mobile_app/build_output.log
+*.log
+
+# Test output files
+test_output*.log
+writeget_ui_inspection.log
