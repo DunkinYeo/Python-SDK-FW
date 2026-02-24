@@ -1,11 +1,11 @@
-name: SDK 검증 자동화 테스트
+name: SDK Validation Automation Test
 
 on:
-  # Manual trigger - 수동 실행
+  # Manual trigger
   workflow_dispatch:
     inputs:
       test_suite:
-        description: '실행할 Test Suite'
+        description: 'Test suite to run'
         required: false
         default: 'all'
         type: choice
@@ -15,49 +15,49 @@ on:
           - writeget_only
           - notify_only
       device_serial:
-        description: 'BLE 디바이스 시리얼 넘버 (예: 610031)'
+        description: 'BLE device serial number (e.g., 610031)'
         required: false
         type: string
       target_packets:
-        description: '타겟 패킷 수 (장시간 테스트용, 예: 3600=1시간)'
+        description: 'Target packet count for long-duration test (e.g., 3600 = 1 hour)'
         required: false
         type: number
 
-  # Schedule 비활성화 - 실제 디바이스는 Wellysis 레포에서만 자동 실행
+  # Schedule disabled - device tests run only from Wellysis repo
   # schedule:
   #   - cron: '0 0 * * *'
 
 jobs:
   test:
-    name: SDK 검증 테스트
-    runs-on: self-hosted  # Self-hosted runner 사용 (실제 디바이스 필요)
+    name: SDK Validation Test
+    runs-on: self-hosted  # Self-hosted runner required (real device needed)
 
     steps:
-      - name: 📥 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐍 Python 환경 확인
+      - name: Check Python environment
         run: |
           python3 --version
           which python3
 
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt
 
-      - name: 🔍 Check Android device
+      - name: Check Android device
         run: |
           echo "Checking for connected Android devices..."
           adb devices
           adb shell getprop ro.build.version.release
 
-      - name: 🔍 Check Appium server
+      - name: Check Appium server
         run: |
           echo "Checking if Appium server is running..."
-          curl -s http://localhost:4723/status || echo "⚠️  Appium server may not be running"
+          curl -s http://localhost:4723/status || echo "Appium server may not be running"
 
-      - name: 🧪 Run regression tests
+      - name: Run regression tests
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           APPIUM_SERVER_URL: http://localhost:4723/wd/hub
@@ -82,7 +82,7 @@ jobs:
           TARGET_PACKETS_OPTION=""
           if [ -n "${{ github.event.inputs.target_packets }}" ]; then
             TARGET_PACKETS_OPTION="--target-packets=${{ github.event.inputs.target_packets }}"
-            echo "🎯 Running with target packets: ${{ github.event.inputs.target_packets }}"
+            echo "Running with target packets: ${{ github.event.inputs.target_packets }}"
           fi
 
           # Run tests
@@ -96,7 +96,7 @@ jobs:
             $TARGET_PACKETS_OPTION \
             || true  # Don't fail workflow on test failure
 
-      - name: 📊 Upload test report
+      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +107,7 @@ jobs:
             *.png
           retention-days: 30
 
-      - name: 📤 Send Slack notification
+      - name: Send Slack notification
         if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -116,21 +116,21 @@ jobs:
           GITHUB_RUN_ID: ${{ github.run_id }}
         run: |
           if [ -n "$SLACK_WEBHOOK_URL" ]; then
-            python3 scripts/send_slack_notification.py || echo "⚠️  Failed to send Slack notification"
+            python3 scripts/send_slack_notification.py || echo "Failed to send Slack notification"
           else
-            echo "⚠️  SLACK_WEBHOOK_URL secret not configured"
+            echo "SLACK_WEBHOOK_URL secret not configured"
           fi
 
-      - name: 📈 Generate test summary
+      - name: Generate test summary
         if: always()
         run: |
-          echo "## 📊 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f .report.json ]; then
             python3 .github/scripts/generate_test_summary.py >> $GITHUB_STEP_SUMMARY
           fi
 
-      - name: ❌ Fail if tests failed
+      - name: Fail if tests failed
         if: always()
         run: |
           if [ -f .report.json ]; then

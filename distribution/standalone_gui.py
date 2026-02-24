@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 SDK Validation Test Runner - Standalone (No Appium Required!)
-Appium 서버 없이 실행 가능한 독립 실행형 버전
+Standalone version that runs without an Appium server.
 """
 import tkinter as tk
 from tkinter import ttk, scrolledtext, messagebox
@@ -22,7 +22,7 @@ load_dotenv()
 class StandaloneTestRunner:
     def __init__(self, root):
         self.root = root
-        self.root.title("SDK 검증 테스트 - 독립 실행형")
+        self.root.title("SDK Validation Test - Standalone")
         self.root.geometry("700x850")
         self.root.resizable(False, False)
 
@@ -45,7 +45,7 @@ class StandaloneTestRunner:
 
         header_label = tk.Label(
             header_frame,
-            text="🚀 SDK 검증 테스트",
+            text="SDK Validation Test",
             font=("Arial", 20, "bold"),
             bg="#2196F3",
             fg="white"
@@ -54,7 +54,7 @@ class StandaloneTestRunner:
 
         subtitle_label = tk.Label(
             header_frame,
-            text="Appium 서버 불필요 | Python + ADB만 있으면 OK",
+            text="No Appium Required | Python + ADB Only",
             font=("Arial", 10),
             bg="#2196F3",
             fg="white"
@@ -66,42 +66,42 @@ class StandaloneTestRunner:
         content_frame.pack(fill=tk.BOTH, expand=True)
 
         # System Requirements
-        req_frame = tk.LabelFrame(content_frame, text="필수 요구사항", font=("Arial", 12, "bold"), padx=10, pady=10)
+        req_frame = tk.LabelFrame(content_frame, text="Requirements", font=("Arial", 12, "bold"), padx=10, pady=10)
         req_frame.pack(fill=tk.X, pady=10)
 
         requirements = [
-            "✅ Python 3.11+ 설치됨",
-            "✅ ADB (Android Debug Bridge) 설치됨",
-            "✅ Android 디바이스 USB 연결",
-            "✅ BLE 패치 디바이스 준비"
+            "[OK] Python 3.11+ installed",
+            "[OK] ADB (Android Debug Bridge) installed",
+            "[OK] Android device connected via USB",
+            "[OK] BLE patch device ready"
         ]
 
         for req in requirements:
             tk.Label(req_frame, text=req, font=("Arial", 9), anchor=tk.W).pack(anchor=tk.W, pady=2)
 
         # Device Serial Input
-        serial_frame = tk.LabelFrame(content_frame, text="디바이스 설정", font=("Arial", 12, "bold"), padx=10, pady=10)
+        serial_frame = tk.LabelFrame(content_frame, text="Device Settings", font=("Arial", 12, "bold"), padx=10, pady=10)
         serial_frame.pack(fill=tk.X, pady=10)
 
-        tk.Label(serial_frame, text="BLE 디바이스 시리얼:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
+        tk.Label(serial_frame, text="BLE Device Serial:", font=("Arial", 10)).grid(row=0, column=0, sticky=tk.W, pady=5)
         serial_entry = tk.Entry(serial_frame, textvariable=self.device_serial, font=("Arial", 10), width=30)
         serial_entry.grid(row=0, column=1, pady=5, padx=10)
-        tk.Label(serial_frame, text="예: 610031", font=("Arial", 8), fg="gray").grid(row=0, column=2, sticky=tk.W)
+        tk.Label(serial_frame, text="e.g. 610031", font=("Arial", 8), fg="gray").grid(row=0, column=2, sticky=tk.W)
 
         # Test Options
-        test_frame = tk.LabelFrame(content_frame, text="테스트 옵션", font=("Arial", 12, "bold"), padx=10, pady=10)
+        test_frame = tk.LabelFrame(content_frame, text="Test Options", font=("Arial", 12, "bold"), padx=10, pady=10)
         test_frame.pack(fill=tk.X, pady=10)
 
         packet_check = tk.Checkbutton(
             test_frame,
-            text="패킷 모니터링 테스트 포함",
+            text="Include packet monitoring test",
             variable=self.run_packet_test,
             font=("Arial", 10),
             command=self.toggle_packet_options
         )
         packet_check.grid(row=0, column=0, columnspan=3, sticky=tk.W, pady=5)
 
-        self.packet_label = tk.Label(test_frame, text="타겟 패킷 수:", font=("Arial", 10), state=tk.DISABLED)
+        self.packet_label = tk.Label(test_frame, text="Target packet count:", font=("Arial", 10), state=tk.DISABLED)
         self.packet_label.grid(row=1, column=0, sticky=tk.W, pady=5)
 
         self.packet_entry = tk.Entry(test_frame, textvariable=self.target_packets, font=("Arial", 10), width=15, state=tk.DISABLED)
@@ -109,7 +109,7 @@ class StandaloneTestRunner:
 
         packet_info = tk.Label(
             test_frame,
-            text="60=1분, 600=10분, 3600=1시간",
+            text="60=1min, 600=10min, 3600=1hr",
             font=("Arial", 8),
             fg="gray",
             state=tk.DISABLED
@@ -118,12 +118,12 @@ class StandaloneTestRunner:
         self.packet_info_label = packet_info
 
         # Status Section
-        status_frame = tk.LabelFrame(content_frame, text="시스템 상태", font=("Arial", 12, "bold"), padx=10, pady=10)
+        status_frame = tk.LabelFrame(content_frame, text="System Status", font=("Arial", 12, "bold"), padx=10, pady=10)
         status_frame.pack(fill=tk.BOTH, expand=True, pady=10)
 
         self.status_label = tk.Label(
             status_frame,
-            text="시스템 확인 중...",
+            text="Checking system...",
             font=("Arial", 10),
             fg="orange"
         )
@@ -147,7 +147,7 @@ class StandaloneTestRunner:
 
         self.start_button = tk.Button(
             button_frame,
-            text="🚀 테스트 시작",
+            text="Start Test",
             font=("Arial", 14, "bold"),
             bg="#4CAF50",
             fg="white",
@@ -159,7 +159,7 @@ class StandaloneTestRunner:
 
         self.stop_button = tk.Button(
             button_frame,
-            text="⏹ 중지",
+            text="Stop",
             font=("Arial", 14, "bold"),
             bg="#f44336",
             fg="white",
@@ -172,7 +172,7 @@ class StandaloneTestRunner:
         # Auto-setup button
         setup_button = tk.Button(
             button_frame,
-            text="⚙️ 자동 설정",
+            text="Auto Setup",
             font=("Arial", 14, "bold"),
             bg="#FF9800",
             fg="white",
@@ -209,12 +209,12 @@ class StandaloneTestRunner:
     def check_environment(self):
         """Check if required environment is set up."""
         self.log("="*60 + "\n")
-        self.log("환경 확인 중...\n\n")
+        self.log("Checking environment...\n\n")
 
         has_errors = False
 
         # Check Python
-        self.log(f"✅ Python {sys.version.split()[0]}\n", "green")
+        self.log(f"[OK] Python {sys.version.split()[0]}\n", "green")
 
         # Check ADB
         try:
@@ -226,7 +226,7 @@ class StandaloneTestRunner:
             )
             if result.returncode == 0:
                 version = result.stdout.split('\n')[0]
-                self.log(f"✅ ADB: {version}\n", "green")
+                self.log(f"[OK] ADB: {version}\n", "green")
 
                 # Check for connected devices
                 result = subprocess.run(
@@ -239,58 +239,58 @@ class StandaloneTestRunner:
                 devices = [line for line in result.stdout.split('\n') if '\tdevice' in line]
                 if devices:
                     self.android_device = devices[0].split('\t')[0]
-                    self.log(f"✅ Android 디바이스 연결됨: {self.android_device}\n", "green")
+                    self.log(f"[OK] Android device connected: {self.android_device}\n", "green")
                 else:
-                    self.log("❌ Android 디바이스가 연결되지 않음\n", "red")
-                    self.log("   USB로 디바이스를 연결하고 USB 디버깅을 활성화하세요\n", "gray")
+                    self.log("[ERROR] No Android device connected\n", "red")
+                    self.log("   Connect device via USB and enable USB debugging\n", "gray")
                     has_errors = True
             else:
                 raise Exception("ADB not working")
 
         except Exception as e:
-            self.log("❌ ADB가 설치되지 않음\n", "red")
-            self.log(f"   오류: {e}\n", "gray")
-            self.log("   설치: https://developer.android.com/studio/releases/platform-tools\n", "gray")
+            self.log("[ERROR] ADB not installed\n", "red")
+            self.log(f"   Error: {e}\n", "gray")
+            self.log("   Install: https://developer.android.com/studio/releases/platform-tools\n", "gray")
             has_errors = True
 
         # Check uiautomator2
         try:
             import uiautomator2
-            self.log("✅ uiautomator2 설치됨\n", "green")
+            self.log("[OK] uiautomator2 installed\n", "green")
         except ImportError:
-            self.log("⚠️  uiautomator2 미설치\n", "orange")
-            self.log("   '자동 설정' 버튼을 클릭하여 설치하세요\n", "gray")
+            self.log("[WARN] uiautomator2 not installed\n", "orange")
+            self.log("   Click 'Auto Setup' to install\n", "gray")
             has_errors = True
 
         # Check Slack webhook
         if os.getenv('SLACK_WEBHOOK_URL'):
-            self.log("✅ Slack 알림 설정됨\n", "green")
+            self.log("[OK] Slack notifications configured\n", "green")
         else:
-            self.log("ℹ️  Slack 알림 미설정 (선택사항)\n", "blue")
+            self.log("[INFO] Slack notifications not configured (optional)\n", "blue")
 
         self.log("\n" + "="*60 + "\n")
 
         if has_errors:
-            self.update_status("❌ 설정 필요", "red")
-            self.log("\n⚠️  일부 구성요소가 설치되지 않았습니다.\n", "orange")
-            self.log("'⚙️ 자동 설정' 버튼을 클릭하여 자동으로 설치하세요!\n\n", "blue")
+            self.update_status("[ERROR] Setup required", "red")
+            self.log("\n[WARN] Some components are not installed.\n", "orange")
+            self.log("Click 'Auto Setup' to install automatically!\n\n", "blue")
             self.start_button.config(state=tk.DISABLED)
         else:
-            self.update_status("✅ 준비 완료!", "green")
-            self.log("\n✅ 모든 준비가 완료되었습니다!\n", "green")
-            self.log("'🚀 테스트 시작' 버튼을 클릭하세요.\n\n", "blue")
+            self.update_status("[OK] Ready!", "green")
+            self.log("\n[OK] All components are ready!\n", "green")
+            self.log("Click 'Start Test' to begin.\n\n", "blue")
             self.start_button.config(state=tk.NORMAL)
 
     def auto_setup(self):
         """Automatically install required packages."""
         self.log_text.delete(1.0, tk.END)
         self.log("="*60 + "\n")
-        self.log("⚙️  자동 설정 시작...\n\n", "blue")
+        self.log("Starting auto setup...\n\n", "blue")
 
         def run_setup():
             try:
                 # Install uiautomator2
-                self.log("📦 uiautomator2 설치 중...\n")
+                self.log("Installing uiautomator2...\n")
                 result = subprocess.run(
                     [sys.executable, "-m", "pip", "install", "uiautomator2", "adbutils"],
                     capture_output=True,
@@ -299,16 +299,16 @@ class StandaloneTestRunner:
                 )
 
                 if result.returncode == 0:
-                    self.log("✅ uiautomator2 설치 완료\n\n", "green")
+                    self.log("[OK] uiautomator2 installed\n\n", "green")
 
                     # Initialize uiautomator2 on device
                     if self.android_device:
-                        self.log("📱 Android 디바이스에 uiautomator2 초기화 중...\n")
-                        self.log("   (처음 실행 시 시간이 걸릴 수 있습니다)\n", "gray")
+                        self.log("Initializing uiautomator2 on Android device...\n")
+                        self.log("   (This may take a moment on first run)\n", "gray")
 
                         import uiautomator2 as u2
                         d = u2.connect(self.android_device)
-                        self.log(f"✅ 초기화 완료: {d.info['productName']}\n\n", "green")
+                        self.log(f"[OK] Initialized: {d.info['productName']}\n\n", "green")
 
                     self.root.after(0, self.setup_complete_success)
                 else:
@@ -324,22 +324,22 @@ class StandaloneTestRunner:
     def setup_complete_success(self):
         """Handle successful setup."""
         self.log("="*60 + "\n")
-        self.log("✅ 자동 설정이 완료되었습니다!\n\n", "green")
+        self.log("[OK] Auto setup complete!\n\n", "green")
         messagebox.showinfo(
-            "설정 완료",
-            "✅ 모든 구성요소가 성공적으로 설치되었습니다!\n\n"
-            "환경을 다시 확인합니다..."
+            "Setup Complete",
+            "[OK] All components installed successfully!\n\n"
+            "Re-checking environment..."
         )
         self.check_environment()
 
     def setup_complete_failure(self, error):
         """Handle setup failure."""
         self.log("="*60 + "\n")
-        self.log(f"❌ 설정 실패: {error}\n\n", "red")
+        self.log(f"[ERROR] Setup failed: {error}\n\n", "red")
         messagebox.showerror(
-            "설정 실패",
-            f"자동 설정 중 오류가 발생했습니다:\n\n{error}\n\n"
-            "수동으로 설치해주세요:\n"
+            "Setup Failed",
+            f"An error occurred during auto setup:\n\n{error}\n\n"
+            "Please install manually:\n"
             "pip install uiautomator2 adbutils"
         )
 
@@ -363,19 +363,19 @@ class StandaloneTestRunner:
     def start_test(self):
         """Start the test."""
         if not self.android_device:
-            messagebox.showerror("오류", "Android 디바이스가 연결되지 않았습니다.")
+            messagebox.showerror("Error", "No Android device connected.")
             return
 
         if not self.device_serial.get():
-            messagebox.showerror("오류", "BLE 디바이스 시리얼 넘버를 입력하세요")
+            messagebox.showerror("Error", "Please enter a BLE device serial number.")
             return
 
         response = messagebox.showinfo(
-            "테스트 시작",
-            "✅ 현재 기본 테스트만 지원합니다.\n\n"
-            "전체 테스트를 실행하려면 기존 스크립트를 사용하세요:\n"
+            "Start Test",
+            "[OK] Currently only basic tests are supported.\n\n"
+            "To run the full test suite, use the script:\n"
             "./scripts/run_full_test_suite.sh\n\n"
-            "또는 원래 GUI 앱을 사용하세요:\n"
+            "Or use the original GUI app:\n"
             "python gui_test_runner.py"
         )
 

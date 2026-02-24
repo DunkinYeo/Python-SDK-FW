@@ -19,7 +19,7 @@ source.include_exts = py,png,jpg,kv,atlas
 version = 1.0.0
 
 # 요구사항 (Android 호환 패키지만 포함)
-requirements = python3,kivy==2.3.0,kivymd==1.1.1,requests,pillow,android
+requirements = python3,kivy==2.3.0,kivymd==1.1.1,requests,pillow
 
 # 앱 아이콘 (선택)
 #icon.filename = %(source.dir)s/data/icon.png

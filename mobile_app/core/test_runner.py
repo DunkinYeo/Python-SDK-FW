@@ -1,6 +1,6 @@
 """
-Test Runner - 실제 테스트 로직 실행
-Android와 PC 환경을 모두 지원합니다.
+Test Runner - Core test execution logic.
+Supports both Android and PC environments.
 """
 
 import time
@@ -8,10 +8,10 @@ from pathlib import Path
 import sys
 import os
 
-# Android 환경 감지
+# Detect Android environment
 IS_ANDROID = 'ANDROID_ARGUMENT' in os.environ or 'ANDROID_ROOT' in os.environ
 
-# uiautomator2는 PC에서만 사용 가능
+# uiautomator2 is only available on PC
 if not IS_ANDROID:
     try:
         import uiautomator2 as u2
@@ -22,13 +22,13 @@ else:
 
 
 class TestRunner:
-    """테스트 실행기"""
+    """Test executor"""
 
     def __init__(self, config, callback):
         """
         Args:
-            config: 테스트 설정 dict
-            callback: 진행 상황 업데이트 콜백 함수(status, progress, log)
+            config: Test configuration dict
+            callback: Progress update callback function(status, progress, log)
         """
         self.config = config
         self.callback = callback
@@ -40,66 +40,56 @@ class TestRunner:
             'error': None
         }
 
-        # 디바이스 연결
         self.d = None
         self.package_name = "com.wellysis.spatch.sdk.sample"
 
         if IS_ANDROID:
-            # Android 환경: Intent 기반 접근
-            self._update('Android 환경 감지', 0, '✅ Android 네이티브 모드')
-            self.d = "android_native"  # 더미 값
+            self._update('Android environment detected', 0, 'Running in Android native mode')
+            self.d = "android_native"
         elif u2:
-            # PC 환경: uiautomator2 사용
             for attempt in range(3):
                 try:
-                    self._update('디바이스 연결 중...', 0, f'연결 시도 {attempt + 1}/3')
+                    self._update('Connecting to device...', 0, f'Connection attempt {attempt + 1}/3')
                     self.d = u2.connect()
 
-                    # 디바이스 정보 확인
                     device_info = self.d.device_info
-                    self._update('디바이스 연결됨', 0, f'✅ {device_info.get("brand", "Unknown")} {device_info.get("model", "Unknown")}')
+                    self._update('Device connected', 0, f'Connected: {device_info.get("brand", "Unknown")} {device_info.get("model", "Unknown")}')
                     break
                 except Exception as e:
                     if attempt == 2:
-                        self.result['error'] = f'디바이스 연결 실패: {str(e)}'
-                        self._update('연결 실패', 0, f'❌ {str(e)}')
+                        self.result['error'] = f'Device connection failed: {str(e)}'
+                        self._update('Connection failed', 0, f'Error: {str(e)}')
                     else:
                         time.sleep(2)
         else:
-            self.result['error'] = 'uiautomator2를 사용할 수 없습니다. PC 환경에서 실행하거나 필요한 패키지를 설치하세요.'
+            self.result['error'] = 'uiautomator2 not available. Run on PC or install required packages.'
 
     def run(self):
-        """테스트 실행"""
+        """Run tests"""
         if not self.d:
-            self._update('실행 불가', 100, '❌ 디바이스가 연결되지 않았습니다')
+            self._update('Cannot run', 100, 'No device connected')
             return
 
         try:
             if IS_ANDROID:
-                # Android 환경: Intent를 통한 앱 실행
-                self._update('SDK 앱 시작 중...', 5, '📱 Intent를 통한 앱 실행')
+                self._update('Launching SDK app...', 5, 'Starting app via Intent')
                 self._launch_app_android()
                 time.sleep(2)
             else:
-                # PC 환경: uiautomator2 사용
-                # 화면 켜기
                 self.d.screen_on()
 
-                # 앱 시작 (앱이 설치되어 있는지 확인)
-                self._update('앱 확인 중...', 5, '📱 SDK 검증 앱 확인')
+                self._update('Checking app...', 5, 'Verifying SDK validation app')
 
                 if not self.d.app_info(self.package_name):
-                    self._update('앱 없음', 100, '❌ SDK 검증 앱이 설치되지 않았습니다')
-                    self.result['error'] = 'SDK 검증 앱이 설치되지 않음'
+                    self._update('App not found', 100, 'SDK validation app is not installed')
+                    self.result['error'] = 'SDK validation app not installed'
                     return
 
-                # 앱 시작
-                self._update('앱 시작 중...', 10, '✅ SDK 검증 앱 실행')
+                self._update('Launching app...', 10, 'Starting SDK validation app')
                 self.d.app_start(self.package_name)
                 time.sleep(3)
 
-            # BLE 연결
-            self._update('BLE 연결 중...', 10, f'✅ BLE 시리얼: {self.config["serial"]}')
+            self._update('Connecting BLE...', 10, f'BLE serial: {self.config["serial"]}')
             if not self._connect_ble():
                 return
 
@@ -113,39 +103,34 @@ class TestRunner:
             current_progress = 20
             progress_step = 70 / max(total_tests, 1)
 
-            # Read 테스트
             if self.config.get('read'):
-                self._update('Read 테스트 중...', current_progress, '📖 Read 화면 테스트 시작')
+                self._update('Running Read tests...', current_progress, 'Starting Read screen tests')
                 self._run_read_tests()
                 current_progress += progress_step
 
-            # WriteGet 테스트
             if self.config.get('writeget'):
-                self._update('WriteGet 테스트 중...', current_progress, '✏️ WriteGet 화면 테스트 시작')
+                self._update('Running WriteGet tests...', current_progress, 'Starting WriteGet screen tests')
                 self._run_writeget_tests()
                 current_progress += progress_step
 
-            # Notify 테스트
             if self.config.get('notify'):
-                self._update('Notify 테스트 중...', current_progress, '📡 Notify 화면 테스트 시작')
+                self._update('Running Notify tests...', current_progress, 'Starting Notify screen tests')
                 self._run_notify_tests()
                 current_progress += progress_step
 
-            # 패킷 모니터링
             if self.config.get('packet_monitoring'):
                 target = self.config.get('target_packets', 60)
-                self._update('패킷 모니터링 중...', current_progress, f'📊 타겟: {target}개 패킷')
+                self._update('Packet monitoring...', current_progress, f'Target: {target} packets')
                 self._run_packet_monitoring(target)
                 current_progress += progress_step
 
-            # 완료
-            self._update('테스트 완료!', 100, '✅ 모든 테스트 완료')
+            self._update('Test complete!', 100, 'All tests finished')
 
         except Exception as e:
-            self._update(f'오류 발생', 100, f'❌ {str(e)}')
+            self._update('Error occurred', 100, f'Error: {str(e)}')
 
     def _launch_app_android(self):
-        """Android에서 Intent를 통해 SDK 검증 앱 실행"""
+        """Launch SDK validation app via Intent on Android"""
         try:
             from jnius import autoclass
             Intent = autoclass('android.content.Intent')
@@ -158,45 +143,40 @@ class TestRunner:
             currentActivity = PythonActivity.mActivity
             currentActivity.startActivity(intent)
 
-            self._update('SDK 앱 실행됨', 10, '✅ 앱이 실행되었습니다')
+            self._update('SDK app launched', 10, 'App started successfully')
         except Exception as e:
-            self._update('앱 실행 실패', 10, f'⚠️ Intent 실행 실패: {str(e)}\n수동으로 SDK 검증 앱을 실행하세요')
+            self._update('Launch failed', 10, f'Intent failed: {str(e)}\nPlease launch the SDK validation app manually')
 
     def _connect_ble(self):
-        """BLE 연결"""
+        """Connect to BLE device"""
         if IS_ANDROID:
-            # Android 환경: 수동 안내
             serial = self.config.get('serial', '610031')
-            self._update('BLE 연결 안내', 15, f'📱 SDK 검증 앱에서 시리얼 {serial}로 연결하세요')
+            self._update('BLE connection guide', 15, f'Please connect to serial {serial} in the SDK validation app')
             time.sleep(3)
             return True
 
         try:
-            # PC 환경: uiautomator2로 자동 연결
-            # Link 화면으로 이동
             if self.d(text="Link").exists:
                 self.d(text="Link").click()
                 time.sleep(1)
 
-            # 시리얼 넘버 입력
             serial = self.config.get('serial', '610031')
             if self.d(resourceId="com.wellysis.spatch.sdk.sample:id/et_sensor_sn").exists:
                 self.d(resourceId="com.wellysis.spatch.sdk.sample:id/et_sensor_sn").set_text(serial)
                 time.sleep(0.5)
 
-            # Connect 버튼 클릭
             if self.d(text="CONNECT").exists:
                 self.d(text="CONNECT").click()
-                time.sleep(5)  # 연결 대기
+                time.sleep(5)
 
             return True
 
         except Exception as e:
-            self._update('BLE 연결 실패', 10, f'❌ {str(e)}')
+            self._update('BLE connection failed', 10, f'Error: {str(e)}')
             return False
 
     def _run_read_tests(self):
-        """Read 테스트 실행"""
+        """Run Read screen tests"""
         read_tests = [
             'Battery',
             'Model Number',
@@ -209,18 +189,15 @@ class TestRunner:
 
         try:
             if IS_ANDROID:
-                # Android 환경: 시뮬레이션 모드
-                self._update('Read 테스트 시뮬레이션', 0, '⏰ Android 환경에서는 시뮬레이션으로 진행됩니다')
+                self._update('Read test simulation', 0, 'Running in simulation mode on Android')
                 for test in read_tests:
                     if self.cancelled:
                         break
                     time.sleep(0.5)
                     self.result['tests'][f'Read - {test}'] = True
                     self.result['passed'] += 1
-                    self._update('', 0, f'  ✅ {test} (시뮬레이션)')
+                    self._update('', 0, f'  [PASS] {test} (simulation)')
             else:
-                # PC 환경: 실제 테스트
-                # Read 화면으로 이동
                 if self.d(text="Read").exists:
                     self.d(text="Read").click()
                     time.sleep(1)
@@ -240,111 +217,98 @@ class TestRunner:
                     time.sleep(0.5)
 
         except Exception as e:
-            self._update('Read 테스트 오류', 0, f'❌ {str(e)}')
+            self._update('Read test error', 0, f'Error: {str(e)}')
 
     def _execute_read_test(self, test_name):
-        """개별 Read 테스트 실행 (PC 환경 전용)"""
+        """Execute individual Read test (PC only)"""
         if IS_ANDROID:
-            return True  # Android에서는 시뮬레이션
+            return True
 
         try:
-            # 테스트 항목 클릭
             if self.d(text=test_name).exists:
                 self.d(text=test_name).click()
                 time.sleep(1)
 
-                # READ 버튼 클릭
                 if self.d(text="READ").exists:
                     self.d(text="READ").click()
                     time.sleep(2)
 
-                # 결과 확인 (간단히 성공으로 간주)
-                self._update('', 0, f'  ✅ {test_name}')
+                self._update('', 0, f'  [PASS] {test_name}')
                 return True
             else:
-                self._update('', 0, f'  ⚠️  {test_name} 항목 없음')
+                self._update('', 0, f'  [SKIP] {test_name} not found')
                 return False
 
         except Exception as e:
-            self._update('', 0, f'  ❌ {test_name}: {str(e)}')
+            self._update('', 0, f'  [FAIL] {test_name}: {str(e)}')
             return False
 
     def _run_writeget_tests(self):
-        """WriteGet 테스트 실행"""
+        """Run WriteGet screen tests"""
         try:
             if IS_ANDROID:
-                # Android 환경: 시뮬레이션
                 actions = ['Start', 'Pause', 'Restart']
                 for action in actions:
                     time.sleep(0.5)
                     self.result['tests'][f'WriteGet - {action}'] = True
                     self.result['passed'] += 1
-                    self._update('', 0, f'  ✅ {action} (시뮬레이션)')
+                    self._update('', 0, f'  [PASS] {action} (simulation)')
             else:
-                # PC 환경: 실제 테스트
-                # WriteGet 화면으로 이동
                 if self.d(text="WriteGet").exists:
                     self.d(text="WriteGet").click()
                     time.sleep(1)
 
-                # Start 버튼 클릭
                 if self.d(text="START").exists:
                     self.d(text="START").click()
                     time.sleep(2)
                     self.result['tests']['WriteGet - Start'] = True
                     self.result['passed'] += 1
-                    self._update('', 0, '  ✅ Start')
+                    self._update('', 0, '  [PASS] Start')
 
-                # Pause 버튼 클릭
                 if self.d(text="PAUSE").exists:
                     self.d(text="PAUSE").click()
                     time.sleep(2)
                     self.result['tests']['WriteGet - Pause'] = True
                     self.result['passed'] += 1
-                    self._update('', 0, '  ✅ Pause')
+                    self._update('', 0, '  [PASS] Pause')
 
-                # Restart 버튼 클릭
                 if self.d(text="RESTART").exists:
                     self.d(text="RESTART").click()
                     time.sleep(2)
                     self.result['tests']['WriteGet - Restart'] = True
                     self.result['passed'] += 1
-                    self._update('', 0, '  ✅ Restart')
+                    self._update('', 0, '  [PASS] Restart')
 
         except Exception as e:
-            self._update('WriteGet 테스트 오류', 0, f'❌ {str(e)}')
+            self._update('WriteGet test error', 0, f'Error: {str(e)}')
             self.result['failed'] += 1
 
     def _run_notify_tests(self):
-        """Notify 테스트 실행"""
+        """Run Notify screen tests"""
         try:
             if IS_ANDROID:
-                # Android 환경: 시뮬레이션
                 time.sleep(0.5)
                 self.result['tests']['Notify - ECG'] = True
                 self.result['passed'] += 1
-                self._update('', 0, '  ✅ ECG Notify (시뮬레이션)')
+                self._update('', 0, '  [PASS] ECG Notify (simulation)')
             else:
-                # PC 환경: 실제 테스트
-                # Notify 화면으로 이동
                 if self.d(text="Notify").exists:
                     self.d(text="Notify").click()
                     time.sleep(1)
 
-                # ECG Notify 활성화
                 if self.d(text="ECG").exists:
                     self.d(text="ECG").click()
                     time.sleep(1)
                     self.result['tests']['Notify - ECG'] = True
                     self.result['passed'] += 1
-                    self._update('', 0, '  ✅ ECG Notify')
+                    self._update('', 0, '  [PASS] ECG Notify')
 
         except Exception as e:
-            self._update('Notify 테스트 오류', 0, f'❌ {str(e)}')
+            self._update('Notify test error', 0, f'Error: {str(e)}')
             self.result['failed'] += 1
 
     def _run_packet_monitoring(self, target):
-        """패킷 모니터링"""
+        """Run packet monitoring"""
         try:
             count = 0
             start_time = time.time()
@@ -355,26 +319,26 @@ class TestRunner:
 
                 if count % 10 == 0:
                     elapsed = time.time() - start_time
-                    self._update('', 0, f'  📊 패킷: {count}/{target} ({elapsed:.1f}초)')
+                    self._update('', 0, f'  Packets: {count}/{target} ({elapsed:.1f}s)')
 
             if not self.cancelled:
                 self.result['tests']['Packet Monitoring'] = True
                 self.result['passed'] += 1
-                self._update('', 0, f'  ✅ 패킷 모니터링 완료: {count}개')
+                self._update('', 0, f'  [PASS] Packet monitoring complete: {count} packets')
 
         except Exception as e:
-            self._update('패킷 모니터링 오류', 0, f'❌ {str(e)}')
+            self._update('Packet monitoring error', 0, f'Error: {str(e)}')
             self.result['failed'] += 1
 
     def _update(self, status, progress, log):
-        """진행 상황 업데이트"""
+        """Send progress update"""
         if self.callback:
             self.callback(status, progress, log)
 
     def cancel(self):
-        """테스트 취소"""
+        """Cancel the test"""
         self.cancelled = True
 
     def get_result(self):
-        """결과 반환"""
+        """Return test result"""
         return self.result
