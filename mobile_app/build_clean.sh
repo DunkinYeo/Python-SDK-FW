@@ -15,9 +15,13 @@ echo ""
 # Java 17 설정 (Android 빌드 필수)
 echo "☕ Java 17 설정 중..."
 export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
-export PATH="$JAVA_HOME/bin:$PATH"
+export PATH="/opt/homebrew/opt/gpatch/libexec/gnubin:$JAVA_HOME/bin:$PATH"
 echo "✅ JAVA_HOME: $JAVA_HOME"
 java -version
+
+# CMake 호환성 설정 (CMake < 3.5 에러 방지)
+export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+echo "✅ CMAKE_ARGS: $CMAKE_ARGS"
 echo ""
 
 # Material Design 버전을 main.py로 복사

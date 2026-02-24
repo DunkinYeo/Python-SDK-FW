@@ -23,9 +23,9 @@ on:
         required: false
         type: number
 
-  # Schedule - 매일 오전 9시 (KST) 자동 실행
-  schedule:
-    - cron: '0 0 * * *'  # UTC 00:00 = KST 09:00
+  # Schedule 비활성화 - 실제 디바이스는 Wellysis 레포에서만 자동 실행
+  # schedule:
+  #   - cron: '0 0 * * *'
 
 jobs:
   test:
