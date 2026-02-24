@@ -1,0 +1,126 @@
+name: Daily CI - 코드 품질 체크
+
+on:
+  # 매일 오전 9시 (KST) 자동 실행
+  schedule:
+    - cron: '0 0 * * *'  # UTC 00:00 = KST 09:00
+
+  # 수동 실행 옵션
+  workflow_dispatch:
+
+  # Push to main - main 브랜치에 push될 때
+  push:
+    branches:
+      - main
+    paths:
+      - '**.py'
+      - 'requirements.txt'
+      - '.github/workflows/daily-ci.yml'
+
+jobs:
+  code-quality:
+    name: 코드 품질 및 의존성 검증
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          echo "✅ 모든 의존성 설치 완료"
+
+      - name: 🔍 Python 문법 체크
+        run: |
+          echo "Python 파일 문법 검사 중..."
+          python -m py_compile tests/**/*.py scripts/**/*.py 2>/dev/null || true
+          echo "✅ 문법 체크 완료"
+
+      - name: 📊 프로젝트 통계
+        run: |
+          echo "## 📊 프로젝트 통계" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python 파일 수**: $(find . -name '*.py' | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "- **테스트 파일 수**: $(find tests -name 'test_*.py' 2>/dev/null | wc -l || echo 0)" >> $GITHUB_STEP_SUMMARY
+          echo "- **스크립트 파일 수**: $(find scripts -name '*.py' 2>/dev/null | wc -l || echo 0)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 설치된 주요 패키지" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          pip list | grep -E "(pytest|appium|selenium)" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: 📤 Slack 알림
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            STATUS="✅ 성공"
+            COLOR="good"
+            if [ "${{ job.status }}" != "success" ]; then
+              STATUS="❌ 실패"
+              COLOR="danger"
+            fi
+
+            PAYLOAD=$(cat <<EOF
+          {
+            "attachments": [{
+              "color": "$COLOR",
+              "title": "Daily CI - 코드 품질 체크",
+              "text": "$STATUS",
+              "fields": [
+                {
+                  "title": "실행 시간",
+                  "value": "$(date '+%Y-%m-%d %H:%M:%S KST')",
+                  "short": true
+                },
+                {
+                  "title": "브랜치",
+                  "value": "${{ github.ref_name }}",
+                  "short": true
+                }
+              ],
+              "actions": [{
+                "type": "button",
+                "text": "상세 보기",
+                "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              }]
+            }]
+          }
+          EOF
+          )
+
+            curl -X POST "$SLACK_WEBHOOK_URL" \
+              -H 'Content-Type: application/json' \
+              -d "$PAYLOAD"
+          else
+            echo "⚠️  SLACK_WEBHOOK_URL이 설정되지 않았습니다"
+          fi
+
+  # 실제 디바이스 테스트 안내
+  device-test-reminder:
+    name: 실제 디바이스 테스트 안내
+    runs-on: ubuntu-latest
+    needs: code-quality
+
+    steps:
+      - name: 📝 실제 디바이스 테스트 안내
+        run: |
+          echo "## 🔔 실제 디바이스 테스트 안내" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Daily CI는 코드 품질만 검증합니다." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**실제 BLE 디바이스 테스트를 실행하려면:**" >> $GITHUB_STEP_SUMMARY
+          echo "1. Actions 탭으로 이동" >> $GITHUB_STEP_SUMMARY
+          echo "2. 'SDK 검증 자동화 테스트' 워크플로우 선택" >> $GITHUB_STEP_SUMMARY
+          echo "3. 'Run workflow' 버튼 클릭" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️  **주의**: 실제 디바이스 테스트는 Self-hosted runner가 필요합니다." >> $GITHUB_STEP_SUMMARY

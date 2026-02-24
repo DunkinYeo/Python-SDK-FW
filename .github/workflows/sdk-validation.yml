@@ -23,18 +23,8 @@ on:
         required: false
         type: number
 
-  # Schedule - 매일 오전 9시 (KST)
-  schedule:
-    - cron: '0 0 * * *'  # UTC 00:00 = KST 09:00
-
-  # Push to main - main 브랜치에 push될 때
-  push:
-    branches:
-      - main
-    paths:
-      - 'tests/**'
-      - 'scripts/**'
-      - '.github/workflows/sdk-validation.yml'
+  # Schedule 제거 - 수동 실행 전용으로 변경
+  # Push 트리거 제거 - 수동 실행 전용으로 변경
 
 jobs:
   test:
