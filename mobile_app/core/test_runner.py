@@ -6,9 +6,10 @@ Android와 PC 환경을 모두 지원합니다.
 import time
 from pathlib import Path
 import sys
+import os
 
 # Android 환경 감지
-IS_ANDROID = 'ANDROID_ARGUMENT' in sys.environ or 'ANDROID_ROOT' in sys.environ
+IS_ANDROID = 'ANDROID_ARGUMENT' in os.environ or 'ANDROID_ROOT' in os.environ
 
 # uiautomator2는 PC에서만 사용 가능
 if not IS_ANDROID:
