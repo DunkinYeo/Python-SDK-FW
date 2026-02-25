@@ -1,34 +1,41 @@
 """
 Test Runner - Core test execution logic.
-Supports both Android and PC environments.
+Runs BLE GATT tests directly on Android using BluetoothGatt API.
+No dependency on any external SDK sample app.
 """
 
 import time
-from pathlib import Path
-import sys
+import threading
 import os
 
-# Detect Android environment
 IS_ANDROID = 'ANDROID_ARGUMENT' in os.environ or 'ANDROID_ROOT' in os.environ
 
-# uiautomator2 is only available on PC
-if not IS_ANDROID:
-    try:
-        import uiautomator2 as u2
-    except ImportError:
-        u2 = None
-else:
-    u2 = None
+from .ble_manager import (
+    BLEManager,
+    BATTERY_SVC, BATTERY_LEVEL,
+    DEVINFO_SVC, MODEL_NUMBER, SERIAL_NUMBER,
+    FIRMWARE_REVISION, HARDWARE_REVISION, SOFTWARE_REVISION,
+    WELLYSIS_SVC, WELLYSIS_CONTROL, WELLYSIS_ECG_NOTIFY,
+    CMD_START, CMD_PAUSE, CMD_RESTART, CMD_STOP,
+    HAS_BLE,
+)
+
+_WELLYSIS_TODO = 'TODO_WELLYSIS_SERVICE_UUID'
 
 
 class TestRunner:
-    """Test executor"""
+    """BLE GATT test executor. Runs directly on Android without an external app."""
 
     def __init__(self, config, callback):
         """
         Args:
-            config: Test configuration dict
-            callback: Progress update callback function(status, progress, log)
+            config: Test configuration dict with keys:
+                      device_address (str): BLE MAC address (AA:BB:CC:DD:EE:FF)
+                      device_name (str): Human-readable device name
+                      read, writeget, notify, packet_monitoring (bool): test flags
+                      target_packets (int): target for packet monitoring
+            callback: Progress callback  fn(status: str, progress: float, log: str)
+                      pass progress=-1 to update log only (no progress bar change)
         """
         self.config = config
         self.callback = callback
@@ -37,308 +44,243 @@ class TestRunner:
             'passed': 0,
             'failed': 0,
             'tests': {},
-            'error': None
+            'error': None,
+            'fw_version': None,
         }
+        self.ble = BLEManager()
 
-        self.d = None
-        self.package_name = "com.wellysis.spatch.sdk.sample"
-
-        if IS_ANDROID:
-            self._update('Android environment detected', 0, 'Running in Android native mode')
-            self.d = "android_native"
-        elif u2:
-            for attempt in range(3):
-                try:
-                    self._update('Connecting to device...', 0, f'Connection attempt {attempt + 1}/3')
-                    self.d = u2.connect()
-
-                    device_info = self.d.device_info
-                    self._update('Device connected', 0, f'Connected: {device_info.get("brand", "Unknown")} {device_info.get("model", "Unknown")}')
-                    break
-                except Exception as e:
-                    if attempt == 2:
-                        self.result['error'] = f'Device connection failed: {str(e)}'
-                        self._update('Connection failed', 0, f'Error: {str(e)}')
-                    else:
-                        time.sleep(2)
-        else:
-            self.result['error'] = 'uiautomator2 not available. Run on PC or install required packages.'
+    # ── Public API ────────────────────────────────────────────────────────────
 
     def run(self):
-        """Run tests"""
-        if not self.d:
-            self._update('Cannot run', 100, 'No device connected')
+        """Run the selected test suites."""
+        address = self.config.get('device_address')
+        if not address:
+            self.result['error'] = 'No BLE device selected'
+            self._update('Error', 100, '[ERROR] No BLE device selected')
+            return
+
+        if not IS_ANDROID:
+            self.result['error'] = 'BLE testing requires Android'
+            self._update('Android required', 100,
+                         '[WARN] BLE tests can only run on Android. '
+                         'Connect an Android device and install the APK.')
+            return
+
+        if not HAS_BLE:
+            self.result['error'] = 'BLE not available'
+            self._update('BLE unavailable', 100,
+                         '[ERROR] Bluetooth API unavailable on this device.')
             return
 
         try:
-            if IS_ANDROID:
-                self._update('Launching SDK app...', 5, 'Starting app via Intent')
-                self._launch_app_android()
-                time.sleep(2)
-            else:
-                self.d.screen_on()
+            # Connect
+            name = self.config.get('device_name', address)
+            self._update('Connecting...', 5, f'Connecting to {name} ({address})')
+            self.ble.connect(address, timeout=15)
+            self._update('Connected', 15, f'[OK] Connected to {name}')
 
-                self._update('Checking app...', 5, 'Verifying SDK validation app')
+            # Calculate progress steps
+            flags = ['read', 'writeget', 'notify', 'packet_monitoring']
+            total = sum(1 for f in flags if self.config.get(f, False))
+            progress = 15.0
+            step = 80.0 / max(total, 1)
 
-                if not self.d.app_info(self.package_name):
-                    self._update('App not found', 100, 'SDK validation app is not installed')
-                    self.result['error'] = 'SDK validation app not installed'
-                    return
-
-                self._update('Launching app...', 10, 'Starting SDK validation app')
-                self.d.app_start(self.package_name)
-                time.sleep(3)
-
-            self._update('Connecting BLE...', 10, f'BLE serial: {self.config["serial"]}')
-            if not self._connect_ble():
-                return
-
-            total_tests = sum([
-                self.config.get('read', False),
-                self.config.get('writeget', False),
-                self.config.get('notify', False),
-                self.config.get('packet_monitoring', False)
-            ])
-
-            current_progress = 20
-            progress_step = 70 / max(total_tests, 1)
-
-            if self.config.get('read'):
-                self._update('Running Read tests...', current_progress, 'Starting Read screen tests')
+            if self.config.get('read') and not self.cancelled:
+                self._update('Read tests...', progress, '--- Read Tests ---')
                 self._run_read_tests()
-                current_progress += progress_step
+                progress += step
 
-            if self.config.get('writeget'):
-                self._update('Running WriteGet tests...', current_progress, 'Starting WriteGet screen tests')
+            if self.config.get('writeget') and not self.cancelled:
+                self._update('WriteGet tests...', progress, '--- WriteGet Tests ---')
                 self._run_writeget_tests()
-                current_progress += progress_step
+                progress += step
 
-            if self.config.get('notify'):
-                self._update('Running Notify tests...', current_progress, 'Starting Notify screen tests')
+            if self.config.get('notify') and not self.cancelled:
+                self._update('Notify tests...', progress, '--- Notify Tests ---')
                 self._run_notify_tests()
-                current_progress += progress_step
+                progress += step
 
-            if self.config.get('packet_monitoring'):
+            if self.config.get('packet_monitoring') and not self.cancelled:
                 target = self.config.get('target_packets', 60)
-                self._update('Packet monitoring...', current_progress, f'Target: {target} packets')
+                self._update('Packet monitoring...', progress, f'--- Packet Monitoring (target: {target}) ---')
                 self._run_packet_monitoring(target)
-                current_progress += progress_step
-
-            self._update('Test complete!', 100, 'All tests finished')
+                progress += step
 
         except Exception as e:
-            self._update('Error occurred', 100, f'Error: {str(e)}')
+            self.result['error'] = str(e)
+            self._update('Error', 90, f'[ERROR] {e}')
 
-    def _launch_app_android(self):
-        """Launch SDK validation app via Intent on Android"""
-        try:
-            from jnius import autoclass
-            Intent = autoclass('android.content.Intent')
-            PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        finally:
+            try:
+                self.ble.disconnect()
+            except Exception:
+                pass
 
-            intent = Intent()
-            intent.setClassName(self.package_name, f"{self.package_name}.MainActivity")
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
-            currentActivity = PythonActivity.mActivity
-            currentActivity.startActivity(intent)
-
-            self._update('SDK app launched', 10, 'App started successfully')
-        except Exception as e:
-            self._update('Launch failed', 10, f'Intent failed: {str(e)}\nPlease launch the SDK validation app manually')
-
-    def _connect_ble(self):
-        """Connect to BLE device"""
-        if IS_ANDROID:
-            serial = self.config.get('serial', '610031')
-            self._update('BLE connection guide', 15, f'Please connect to serial {serial} in the SDK validation app')
-            time.sleep(3)
-            return True
-
-        try:
-            if self.d(text="Link").exists:
-                self.d(text="Link").click()
-                time.sleep(1)
-
-            serial = self.config.get('serial', '610031')
-            if self.d(resourceId="com.wellysis.spatch.sdk.sample:id/et_sensor_sn").exists:
-                self.d(resourceId="com.wellysis.spatch.sdk.sample:id/et_sensor_sn").set_text(serial)
-                time.sleep(0.5)
-
-            if self.d(text="CONNECT").exists:
-                self.d(text="CONNECT").click()
-                time.sleep(5)
-
-            return True
-
-        except Exception as e:
-            self._update('BLE connection failed', 10, f'Error: {str(e)}')
-            return False
-
-    def _run_read_tests(self):
-        """Run Read screen tests"""
-        read_tests = [
-            'Battery',
-            'Model Number',
-            'Serial Number',
-            'Firmware Version',
-            'Hardware Version',
-            'Software Version',
-            'Firmware Version & Supported Sampling Rates'
-        ]
-
-        try:
-            if IS_ANDROID:
-                self._update('Read test simulation', 0, 'Running in simulation mode on Android')
-                for test in read_tests:
-                    if self.cancelled:
-                        break
-                    time.sleep(0.5)
-                    self.result['tests'][f'Read - {test}'] = True
-                    self.result['passed'] += 1
-                    self._update('', 0, f'  [PASS] {test} (simulation)')
-            else:
-                if self.d(text="Read").exists:
-                    self.d(text="Read").click()
-                    time.sleep(1)
-
-                for test in read_tests:
-                    if self.cancelled:
-                        break
-
-                    result = self._execute_read_test(test)
-                    self.result['tests'][f'Read - {test}'] = result
-
-                    if result:
-                        self.result['passed'] += 1
-                    else:
-                        self.result['failed'] += 1
-
-                    time.sleep(0.5)
-
-        except Exception as e:
-            self._update('Read test error', 0, f'Error: {str(e)}')
-
-    def _execute_read_test(self, test_name):
-        """Execute individual Read test (PC only)"""
-        if IS_ANDROID:
-            return True
-
-        try:
-            if self.d(text=test_name).exists:
-                self.d(text=test_name).click()
-                time.sleep(1)
-
-                if self.d(text="READ").exists:
-                    self.d(text="READ").click()
-                    time.sleep(2)
-
-                self._update('', 0, f'  [PASS] {test_name}')
-                return True
-            else:
-                self._update('', 0, f'  [SKIP] {test_name} not found')
-                return False
-
-        except Exception as e:
-            self._update('', 0, f'  [FAIL] {test_name}: {str(e)}')
-            return False
-
-    def _run_writeget_tests(self):
-        """Run WriteGet screen tests"""
-        try:
-            if IS_ANDROID:
-                actions = ['Start', 'Pause', 'Restart']
-                for action in actions:
-                    time.sleep(0.5)
-                    self.result['tests'][f'WriteGet - {action}'] = True
-                    self.result['passed'] += 1
-                    self._update('', 0, f'  [PASS] {action} (simulation)')
-            else:
-                if self.d(text="WriteGet").exists:
-                    self.d(text="WriteGet").click()
-                    time.sleep(1)
-
-                if self.d(text="START").exists:
-                    self.d(text="START").click()
-                    time.sleep(2)
-                    self.result['tests']['WriteGet - Start'] = True
-                    self.result['passed'] += 1
-                    self._update('', 0, '  [PASS] Start')
-
-                if self.d(text="PAUSE").exists:
-                    self.d(text="PAUSE").click()
-                    time.sleep(2)
-                    self.result['tests']['WriteGet - Pause'] = True
-                    self.result['passed'] += 1
-                    self._update('', 0, '  [PASS] Pause')
-
-                if self.d(text="RESTART").exists:
-                    self.d(text="RESTART").click()
-                    time.sleep(2)
-                    self.result['tests']['WriteGet - Restart'] = True
-                    self.result['passed'] += 1
-                    self._update('', 0, '  [PASS] Restart')
-
-        except Exception as e:
-            self._update('WriteGet test error', 0, f'Error: {str(e)}')
-            self.result['failed'] += 1
-
-    def _run_notify_tests(self):
-        """Run Notify screen tests"""
-        try:
-            if IS_ANDROID:
-                time.sleep(0.5)
-                self.result['tests']['Notify - ECG'] = True
-                self.result['passed'] += 1
-                self._update('', 0, '  [PASS] ECG Notify (simulation)')
-            else:
-                if self.d(text="Notify").exists:
-                    self.d(text="Notify").click()
-                    time.sleep(1)
-
-                if self.d(text="ECG").exists:
-                    self.d(text="ECG").click()
-                    time.sleep(1)
-                    self.result['tests']['Notify - ECG'] = True
-                    self.result['passed'] += 1
-                    self._update('', 0, '  [PASS] ECG Notify')
-
-        except Exception as e:
-            self._update('Notify test error', 0, f'Error: {str(e)}')
-            self.result['failed'] += 1
-
-    def _run_packet_monitoring(self, target):
-        """Run packet monitoring"""
-        try:
-            count = 0
-            start_time = time.time()
-
-            while count < target and not self.cancelled:
-                time.sleep(0.1)
-                count += 1
-
-                if count % 10 == 0:
-                    elapsed = time.time() - start_time
-                    self._update('', 0, f'  Packets: {count}/{target} ({elapsed:.1f}s)')
-
-            if not self.cancelled:
-                self.result['tests']['Packet Monitoring'] = True
-                self.result['passed'] += 1
-                self._update('', 0, f'  [PASS] Packet monitoring complete: {count} packets')
-
-        except Exception as e:
-            self._update('Packet monitoring error', 0, f'Error: {str(e)}')
-            self.result['failed'] += 1
-
-    def _update(self, status, progress, log):
-        """Send progress update"""
-        if self.callback:
-            self.callback(status, progress, log)
+        self._update('Complete', 100, '--- All tests finished ---')
 
     def cancel(self):
-        """Cancel the test"""
+        """Cancel running tests and disconnect."""
         self.cancelled = True
+        try:
+            self.ble.disconnect()
+        except Exception:
+            pass
 
     def get_result(self):
-        """Return test result"""
+        """Return accumulated test result dict."""
         return self.result
+
+    # ── Read Tests ────────────────────────────────────────────────────────────
+
+    def _run_read_tests(self):
+        """Read standard BLE Device Information and Battery characteristics."""
+        tests = [
+            ('Battery Level',     BATTERY_SVC,  BATTERY_LEVEL,      'uint8'),
+            ('Model Number',      DEVINFO_SVC,  MODEL_NUMBER,        'str'),
+            ('Serial Number',     DEVINFO_SVC,  SERIAL_NUMBER,       'str'),
+            ('Firmware Version',  DEVINFO_SVC,  FIRMWARE_REVISION,   'str'),
+            ('Hardware Version',  DEVINFO_SVC,  HARDWARE_REVISION,   'str'),
+            ('Software Version',  DEVINFO_SVC,  SOFTWARE_REVISION,   'str'),
+        ]
+        for name, svc, char, dtype in tests:
+            if self.cancelled:
+                break
+            self._exec_read(name, svc, char, dtype)
+
+    def _exec_read(self, name, svc_uuid, char_uuid, dtype='str'):
+        key = f'Read - {name}'
+        try:
+            if dtype == 'uint8':
+                val = self.ble.read_uint8(svc_uuid, char_uuid)
+                display = f'{val}%' if 'Battery' in name else str(val)
+            else:
+                val = self.ble.read_string(svc_uuid, char_uuid)
+                display = val if val else '(empty)'
+
+            if name == 'Firmware Version':
+                self.result['fw_version'] = display
+
+            self.result['tests'][key] = True
+            self.result['passed'] += 1
+            self._update('', -1, f'  [PASS] {name}: {display}')
+
+        except Exception as e:
+            self.result['tests'][key] = False
+            self.result['failed'] += 1
+            self._update('', -1, f'  [FAIL] {name}: {e}')
+
+    # ── WriteGet Tests ────────────────────────────────────────────────────────
+
+    def _run_writeget_tests(self):
+        """Write control commands to Wellysis characteristic and verify response."""
+        if WELLYSIS_SVC == _WELLYSIS_TODO:
+            self._update('', -1,
+                '[SKIP] WriteGet: Wellysis UUIDs not configured. '
+                'Replace TODO placeholders in ble_manager.py.')
+            return
+
+        for name, cmd in [
+            ('Start',   CMD_START),
+            ('Pause',   CMD_PAUSE),
+            ('Restart', CMD_RESTART),
+            ('Stop',    CMD_STOP),
+        ]:
+            if self.cancelled:
+                break
+            key = f'WriteGet - {name}'
+            try:
+                self.ble.write(WELLYSIS_SVC, WELLYSIS_CONTROL, cmd)
+                time.sleep(1)
+                self.result['tests'][key] = True
+                self.result['passed'] += 1
+                self._update('', -1, f'  [PASS] {name}')
+            except Exception as e:
+                self.result['tests'][key] = False
+                self.result['failed'] += 1
+                self._update('', -1, f'  [FAIL] {name}: {e}')
+
+    # ── Notify Tests ──────────────────────────────────────────────────────────
+
+    def _run_notify_tests(self):
+        """Enable ECG notification and verify at least 5 packets are received."""
+        if WELLYSIS_SVC == _WELLYSIS_TODO:
+            self._update('', -1,
+                '[SKIP] Notify: Wellysis UUIDs not configured. '
+                'Replace TODO placeholders in ble_manager.py.')
+            return
+
+        packets = []
+        done = threading.Event()
+
+        def on_data(data):
+            packets.append(data)
+            if len(packets) >= 5:
+                done.set()
+
+        key = 'Notify - ECG'
+        try:
+            self.ble.enable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY, on_data)
+            done.wait(timeout=10)
+            self.ble.disable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY)
+
+            if packets:
+                self.result['tests'][key] = True
+                self.result['passed'] += 1
+                self._update('', -1, f'  [PASS] ECG Notify: {len(packets)} packets received')
+            else:
+                self.result['tests'][key] = False
+                self.result['failed'] += 1
+                self._update('', -1, '  [FAIL] ECG Notify: no packets received within 10s')
+
+        except Exception as e:
+            self.result['tests'][key] = False
+            self.result['failed'] += 1
+            self._update('', -1, f'  [FAIL] ECG Notify: {e}')
+
+    # ── Packet Monitoring ─────────────────────────────────────────────────────
+
+    def _run_packet_monitoring(self, target):
+        """Stream ECG packets until target count is reached."""
+        if WELLYSIS_SVC == _WELLYSIS_TODO:
+            self._update('', -1,
+                '[SKIP] Packet monitoring: Wellysis UUIDs not configured. '
+                'Replace TODO placeholders in ble_manager.py.')
+            return
+
+        packets = []
+        done = threading.Event()
+
+        def on_data(data):
+            packets.append(data)
+            if len(packets) % 10 == 0 or len(packets) >= target:
+                self._update('', -1, f'  Packets: {len(packets)}/{target}')
+            if len(packets) >= target:
+                done.set()
+
+        key = 'Packet Monitoring'
+        try:
+            self.ble.enable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY, on_data)
+            timeout = target * 2 + 30
+            done.wait(timeout=timeout)
+            self.ble.disable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY)
+
+            if len(packets) >= target:
+                self.result['tests'][key] = True
+                self.result['passed'] += 1
+                self._update('', -1, f'  [PASS] Packet monitoring: {len(packets)} packets received')
+            else:
+                self.result['tests'][key] = False
+                self.result['failed'] += 1
+                self._update('', -1, f'  [FAIL] Packet monitoring: {len(packets)}/{target} (timeout)')
+
+        except Exception as e:
+            self.result['tests'][key] = False
+            self.result['failed'] += 1
+            self._update('', -1, f'  [FAIL] Packet monitoring: {e}')
+
+    # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _update(self, status, progress, log):
+        """Send progress update. Use progress=-1 to update log without changing progress bar."""
+        if self.callback:
+            self.callback(status, progress, log)

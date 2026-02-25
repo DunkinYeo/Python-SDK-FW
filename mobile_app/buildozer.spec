@@ -1,66 +1,63 @@
 [app]
 
-# 앱 제목
+# App title
 title = SDK Auto Tester
 
-# 패키지 이름
+# Package name
 package.name = sdkautotester
 
-# 패키지 도메인
+# Package domain
 package.domain = com.wellysis
 
-# 소스 디렉토리
+# Source directory
 source.dir = .
 
-# 소스 파일 패턴
+# Source file patterns
 source.include_exts = py,png,jpg,kv,atlas
 
-# 버전
-version = 1.0.0
+# Version
+version = 1.0.1
 
-# 요구사항 (Android 호환 패키지만 포함)
+# Requirements (Android-compatible packages only)
 requirements = python3,kivy==2.3.0,kivymd==1.1.1,requests,pillow
 
-# 앱 아이콘 (선택)
-#icon.filename = %(source.dir)s/data/icon.png
-
-# Presplash (선택)
-#presplash.filename = %(source.dir)s/data/presplash.png
-
-# 앱 방향 (landscape, portrait, all)
+# Orientation (landscape, portrait, all)
 orientation = portrait
 
-# 전체화면
+# Fullscreen
 fullscreen = 0
 
-# 안드로이드 권한
-android.permissions = INTERNET,ACCESS_NETWORK_STATE,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+# Android permissions
+# BLUETOOTH / BLUETOOTH_ADMIN : classic BLE pairing (all Android versions)
+# BLUETOOTH_CONNECT / BLUETOOTH_SCAN : required on Android 12+ (API 31+)
+# ACCESS_FINE_LOCATION : required for BLE scan on Android < 12
+android.permissions = INTERNET,ACCESS_NETWORK_STATE,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE,BLUETOOTH,BLUETOOTH_ADMIN,BLUETOOTH_CONNECT,BLUETOOTH_SCAN,ACCESS_FINE_LOCATION
 
-# Android API 버전
+# Android API version
 android.api = 33
 android.minapi = 21
 android.ndk = 25b
 android.sdk = 33
 
-# Android 아키텍처 (메모리 절약을 위해 arm64-v8a만 빌드)
+# Architecture (arm64-v8a only to save build time)
 android.archs = arm64-v8a
 
-# 로그 활성화
+# Log level
 log_level = 2
 
-# 디버그 모드
+# Debug mode
 debug = 1
 
 [buildozer]
 
-# 빌드 디렉토리
+# Build directory
 build_dir = ./.buildozer
 
-# Bin 디렉토리
+# Bin directory
 bin_dir = ./bin
 
-# 로그 레벨
+# Log level
 log_level = 2
 
-# 경고 무시
+# Warning on root
 warn_on_root = 1

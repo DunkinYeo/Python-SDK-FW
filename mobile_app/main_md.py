@@ -25,14 +25,17 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from core.test_runner import TestRunner
+from core.ble_manager import BLEManager
 
 
 class HomeScreen(MDScreen):
-    """Home screen - Material Design"""
+    """Home screen - select BLE device and configure tests."""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = 'home'
+        self.selected_device_address = None
+        self.selected_device_name = None
 
         layout = MDBoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
 
@@ -47,30 +50,68 @@ class HomeScreen(MDScreen):
         content = MDBoxLayout(orientation='vertical', padding=dp(15), spacing=dp(15), size_hint_y=None)
         content.bind(minimum_height=content.setter('height'))
 
-        config_card = MDCard(
+        # ── BLE Device selection card ─────────────────────────────────────────
+        device_card = MDCard(
             orientation='vertical',
             size_hint=(1, None),
-            height=dp(220),
+            height=dp(240),
             padding=dp(15),
-            spacing=dp(10),
+            spacing=dp(8),
             elevation=2
         )
 
-        config_card.add_widget(MDLabel(
-            text="Test Settings",
+        device_card.add_widget(MDLabel(
+            text="BLE Device",
             font_style="H6",
             size_hint_y=None,
             height=dp(30)
         ))
 
-        self.serial_input = MDTextField(
-            hint_text="BLE Serial Number",
-            text="610031",
-            mode="rectangle",
+        self.selected_label = MDLabel(
+            text="No device selected",
+            theme_text_color="Secondary",
             size_hint_y=None,
-            height=dp(50)
+            height=dp(24)
         )
-        config_card.add_widget(self.serial_input)
+        device_card.add_widget(self.selected_label)
+
+        # Scrollable list of bonded devices
+        self.device_list = MDBoxLayout(
+            orientation='vertical',
+            size_hint=(1, None),
+            height=dp(100),
+            spacing=dp(4)
+        )
+        dev_scroll = ScrollView(size_hint=(1, None), height=dp(110))
+        dev_scroll.add_widget(self.device_list)
+        device_card.add_widget(dev_scroll)
+
+        refresh_btn = MDFlatButton(
+            text="Refresh Devices",
+            size_hint=(1, None),
+            height=dp(36)
+        )
+        refresh_btn.bind(on_press=lambda x: self.refresh_devices())
+        device_card.add_widget(refresh_btn)
+
+        content.add_widget(device_card)
+
+        # ── Test settings card ────────────────────────────────────────────────
+        settings_card = MDCard(
+            orientation='vertical',
+            size_hint=(1, None),
+            height=dp(100),
+            padding=dp(15),
+            spacing=dp(10),
+            elevation=2
+        )
+
+        settings_card.add_widget(MDLabel(
+            text="Test Settings",
+            font_style="H6",
+            size_hint_y=None,
+            height=dp(30)
+        ))
 
         self.packet_input = MDTextField(
             hint_text="Target Packet Count",
@@ -80,10 +121,11 @@ class HomeScreen(MDScreen):
             size_hint_y=None,
             height=dp(50)
         )
-        config_card.add_widget(self.packet_input)
+        settings_card.add_widget(self.packet_input)
 
-        content.add_widget(config_card)
+        content.add_widget(settings_card)
 
+        # ── Test items card ───────────────────────────────────────────────────
         test_card = MDCard(
             orientation='vertical',
             size_hint=(1, None),
@@ -116,6 +158,7 @@ class HomeScreen(MDScreen):
 
         content.add_widget(test_card)
 
+        # ── Start button ──────────────────────────────────────────────────────
         start_btn = MDRaisedButton(
             text="Start Test",
             size_hint=(1, None),
@@ -130,10 +173,56 @@ class HomeScreen(MDScreen):
         layout.add_widget(scroll)
         self.add_widget(layout)
 
+        # Auto-scan bonded devices on first load
+        Clock.schedule_once(lambda dt: self.refresh_devices(), 0.5)
+
+    def refresh_devices(self):
+        """Reload bonded BLE devices and display as selectable buttons."""
+        self.device_list.clear_widgets()
+        try:
+            ble = BLEManager()
+            devices = ble.get_bonded_devices()
+        except Exception:
+            devices = []
+
+        if not devices:
+            self.device_list.add_widget(MDLabel(
+                text="No paired BLE devices found.",
+                theme_text_color="Secondary",
+                size_hint_y=None,
+                height=dp(30)
+            ))
+            return
+
+        for name, address in devices:
+            btn = MDFlatButton(
+                text=f"{name}  ({address})",
+                size_hint=(1, None),
+                height=dp(44)
+            )
+            btn.bind(on_press=lambda x, n=name, a=address: self.select_device(n, a))
+            self.device_list.add_widget(btn)
+
+        # Expand list height to fit all devices
+        self.device_list.height = dp(44) * len(devices)
+
+    def select_device(self, name, address):
+        """Store selected device and highlight the selection."""
+        self.selected_device_name = name
+        self.selected_device_address = address
+        self.selected_label.text = f"Selected: {name}"
+        self.selected_label.theme_text_color = "Primary"
+
     def start_test(self, instance):
-        """Start the test"""
+        """Validate selection and navigate to testing screen."""
+        if not self.selected_device_address:
+            self.selected_label.text = "Please select a BLE device first!"
+            self.selected_label.theme_text_color = "Error"
+            return
+
         config = {
-            'serial': self.serial_input.text,
+            'device_address': self.selected_device_address,
+            'device_name': self.selected_device_name,
             'read': self.checkboxes['read'].active,
             'writeget': self.checkboxes['writeget'].active,
             'notify': self.checkboxes['notify'].active,
@@ -156,6 +245,7 @@ class TestingScreen(MDScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = 'testing'
+        self._current_progress = 0
 
         layout = MDBoxLayout(orientation='vertical')
 
@@ -234,13 +324,14 @@ class TestingScreen(MDScreen):
         self.test_runner = None
 
     def start_test(self, config):
-        """Start the test"""
-        self.status_text = 'Starting test...'
-        self.progress_value = 0
+        """Start the test."""
+        self._current_progress = 0
+        self.status_label.text = 'Starting test...'
         self.progress_bar.value = 0
+        self.progress_label.text = '0%'
         self.log_label.text = ''
-
         self.status_icon.icon = "loading"
+        self.status_icon.text_color = (0.2, 0.6, 1, 1)
 
         self.test_runner = TestRunner(config, self.update_callback)
         thread = threading.Thread(target=self.test_runner.run)
@@ -248,20 +339,24 @@ class TestingScreen(MDScreen):
         thread.start()
 
     def update_callback(self, status, progress, log):
-        """Update progress"""
+        """Update progress. progress=-1 means log-only (no progress bar change)."""
         def update_ui(dt):
-            self.status_label.text = status
-            self.progress_bar.value = progress
-            self.progress_label.text = f'{int(progress)}%'
+            if status:
+                self.status_label.text = status
+            if progress >= 0:
+                self._current_progress = progress
+                self.progress_bar.value = progress
+                self.progress_label.text = f'{int(progress)}%'
 
-            current_log = self.log_label.text
-            new_log = current_log + '\n' + log if current_log else log
-            lines = new_log.split('\n')
-            if len(lines) > 15:
-                lines = lines[-15:]
-            self.log_label.text = '\n'.join(lines)
+            if log:
+                current_log = self.log_label.text
+                new_log = current_log + '\n' + log if current_log else log
+                lines = new_log.split('\n')
+                if len(lines) > 20:
+                    lines = lines[-20:]
+                self.log_label.text = '\n'.join(lines)
 
-            if progress >= 100:
+            if self._current_progress >= 100:
                 self.status_icon.icon = "check-circle"
                 self.status_icon.text_color = (0.2, 0.8, 0.4, 1)
                 Clock.schedule_once(self.show_result, 2)
@@ -269,14 +364,14 @@ class TestingScreen(MDScreen):
         Clock.schedule_once(update_ui, 0)
 
     def show_result(self, dt):
-        """Navigate to result screen"""
+        """Navigate to result screen."""
         app = MDApp.get_running_app()
         result_screen = app.root.get_screen('result')
         result_screen.set_result(self.test_runner.get_result())
         app.root.current = 'result'
 
     def cancel_test(self, instance):
-        """Cancel the test"""
+        """Cancel the test."""
         if self.test_runner:
             self.test_runner.cancel()
         app = MDApp.get_running_app()
@@ -306,7 +401,7 @@ class ResultScreen(MDScreen):
         summary_card = MDCard(
             orientation='vertical',
             size_hint=(1, None),
-            height=dp(150),
+            height=dp(170),
             padding=dp(20),
             elevation=3
         )
@@ -328,6 +423,15 @@ class ResultScreen(MDScreen):
             height=dp(60)
         )
         summary_card.add_widget(self.result_label)
+
+        self.fw_label = MDLabel(
+            text="",
+            halign="center",
+            theme_text_color="Secondary",
+            size_hint_y=None,
+            height=dp(30)
+        )
+        summary_card.add_widget(self.fw_label)
 
         content.add_widget(summary_card)
 
@@ -383,7 +487,7 @@ class ResultScreen(MDScreen):
         self.result_data = None
 
     def set_result(self, result):
-        """Set result data"""
+        """Set result data and update UI."""
         self.result_data = result
 
         if result.get('error'):
@@ -391,6 +495,7 @@ class ResultScreen(MDScreen):
             self.result_icon.text_color = (1, 0.3, 0.3, 1)
             self.result_label.text = "Error occurred"
             self.detail_label.text = result['error']
+            self.fw_label.text = ""
             return
 
         passed = result.get('passed', 0)
@@ -410,6 +515,9 @@ class ResultScreen(MDScreen):
         success_rate = int((passed / total) * 100) if total > 0 else 0
         self.result_label.text = f'Passed: {passed}/{total}\nPass rate: {success_rate}%'
 
+        fw = result.get('fw_version')
+        self.fw_label.text = f'Firmware: {fw}' if fw else ''
+
         details = []
         for test_name, test_result in result.get('tests', {}).items():
             icon = 'PASS' if test_result else 'FAIL'
@@ -418,25 +526,39 @@ class ResultScreen(MDScreen):
         self.detail_label.text = '\n'.join(details) if details else 'No test results'
 
     def share_result(self, instance):
-        """Share results via Android intent"""
+        """Share results via Android share intent."""
         try:
             from jnius import autoclass
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             Intent = autoclass('android.content.Intent')
             String = autoclass('java.lang.String')
 
+            result = self.result_data or {}
+            passed = result.get('passed', 0)
+            failed = result.get('failed', 0)
+            fw = result.get('fw_version', 'N/A')
+
+            text = (
+                f"SDK Auto Tester Results\n"
+                f"Firmware: {fw}\n"
+                f"Passed: {passed}  Failed: {failed}\n"
+                f"Pass rate: {int(passed/(passed+failed)*100) if passed+failed else 0}%\n\n"
+            )
+            for name, res in result.get('tests', {}).items():
+                text += f"[{'PASS' if res else 'FAIL'}] {name}\n"
+
             intent = Intent()
             intent.setAction(Intent.ACTION_SEND)
-            intent.putExtra(Intent.EXTRA_TEXT, String(str(self.result_data)))
+            intent.putExtra(Intent.EXTRA_TEXT, String(text))
             intent.setType('text/plain')
 
             currentActivity = PythonActivity.mActivity
             currentActivity.startActivity(Intent.createChooser(intent, String('Share Results')))
         except Exception:
-            print('Share is only available on Android')
+            pass
 
     def go_home(self, instance):
-        """Return to home screen"""
+        """Return to home screen."""
         app = MDApp.get_running_app()
         app.root.current = 'home'
 
@@ -445,7 +567,6 @@ class SDKAutoTesterApp(MDApp):
     """Main app - Material Design"""
 
     def build(self):
-        """Build the app"""
         self.theme_cls.primary_palette = "Blue"
         self.theme_cls.theme_style = "Light"
 
