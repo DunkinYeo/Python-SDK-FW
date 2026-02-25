@@ -94,22 +94,41 @@ class HomeScreen(MDScreen):
         refresh_btn.bind(on_press=lambda x: self.refresh_devices())
         device_card.add_widget(refresh_btn)
 
-        # ── Manual MAC address input ──────────────────────────────────────────
+        # ── Serial number search ──────────────────────────────────────────────
         device_card.add_widget(MDLabel(
-            text="Or enter MAC address manually:",
+            text="Or enter device serial number:",
             theme_text_color="Secondary",
             size_hint_y=None,
             height=dp(22)
         ))
 
-        self.manual_input = MDTextField(
-            hint_text="AA:BB:CC:DD:EE:FF",
+        serial_row = MDBoxLayout(
+            orientation='horizontal',
+            size_hint=(1, None),
+            height=dp(50),
+            spacing=dp(8)
+        )
+
+        self.serial_input = MDTextField(
+            hint_text="e.g.  610136",
             mode="rectangle",
+            size_hint_x=0.7,
             size_hint_y=None,
             height=dp(50)
         )
-        self.manual_input.bind(text=self._on_manual_input)
-        device_card.add_widget(self.manual_input)
+        serial_row.add_widget(self.serial_input)
+
+        find_btn = MDRaisedButton(
+            text="Find",
+            size_hint_x=0.3,
+            size_hint_y=None,
+            height=dp(50),
+            md_bg_color=(0.2, 0.6, 1, 1)
+        )
+        find_btn.bind(on_press=lambda x: self.find_by_serial())
+        serial_row.add_widget(find_btn)
+
+        device_card.add_widget(serial_row)
 
         content.add_widget(device_card)
 
@@ -223,27 +242,41 @@ class HomeScreen(MDScreen):
         # Expand list height to fit all devices
         self.device_list.height = dp(44) * len(devices)
 
-    def _on_manual_input(self, instance, value):
-        """Update selection when user types a MAC address manually."""
-        value = value.strip()
-        if value:
-            self.selected_device_address = value
-            self.selected_device_name = value
-            self.selected_label.text = f"Manual: {value}"
-            self.selected_label.theme_text_color = "Primary"
-        else:
-            self.selected_device_address = None
-            self.selected_device_name = None
-            self.selected_label.text = "No device selected"
-            self.selected_label.theme_text_color = "Secondary"
+    def find_by_serial(self):
+        """Search paired BLE devices for one whose name contains the serial number."""
+        serial = self.serial_input.text.strip()
+        if not serial:
+            self.selected_label.text = "Enter a serial number first."
+            self.selected_label.theme_text_color = "Error"
+            return
+
+        try:
+            ble = BLEManager()
+            devices = ble.get_bonded_devices()
+        except Exception:
+            devices = []
+
+        # Match: serial number appears anywhere in the device name
+        for name, address in devices:
+            if serial.lower() in name.lower():
+                self.selected_device_name = name
+                self.selected_device_address = address
+                self.selected_label.text = f"Found: {name}"
+                self.selected_label.theme_text_color = "Primary"
+                return
+
+        # Not found in paired devices
+        self.selected_device_address = None
+        self.selected_label.text = f"'{serial}' not found. Pair the device in BT settings first."
+        self.selected_label.theme_text_color = "Error"
 
     def select_device(self, name, address):
-        """Store selected device from paired list and clear manual input."""
+        """Store selected device from paired list and clear serial input."""
         self.selected_device_name = name
         self.selected_device_address = address
         self.selected_label.text = f"Selected: {name}"
         self.selected_label.theme_text_color = "Primary"
-        self.manual_input.text = ""  # clear manual field when picking from list
+        self.serial_input.text = ""  # clear serial field when picking from list
 
     def start_test(self, instance):
         """Validate selection and navigate to testing screen."""
