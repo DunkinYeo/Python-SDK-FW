@@ -54,7 +54,7 @@ class HomeScreen(MDScreen):
         device_card = MDCard(
             orientation='vertical',
             size_hint=(1, None),
-            height=dp(240),
+            height=dp(340),
             padding=dp(15),
             spacing=dp(8),
             elevation=2
@@ -75,24 +75,41 @@ class HomeScreen(MDScreen):
         )
         device_card.add_widget(self.selected_label)
 
-        # Scrollable list of bonded devices
+        # Scrollable list of bonded (paired) devices
         self.device_list = MDBoxLayout(
             orientation='vertical',
             size_hint=(1, None),
             height=dp(100),
             spacing=dp(4)
         )
-        dev_scroll = ScrollView(size_hint=(1, None), height=dp(110))
+        dev_scroll = ScrollView(size_hint=(1, None), height=dp(90))
         dev_scroll.add_widget(self.device_list)
         device_card.add_widget(dev_scroll)
 
         refresh_btn = MDFlatButton(
-            text="Refresh Devices",
+            text="Refresh Paired Devices",
             size_hint=(1, None),
             height=dp(36)
         )
         refresh_btn.bind(on_press=lambda x: self.refresh_devices())
         device_card.add_widget(refresh_btn)
+
+        # ── Manual MAC address input ──────────────────────────────────────────
+        device_card.add_widget(MDLabel(
+            text="Or enter MAC address manually:",
+            theme_text_color="Secondary",
+            size_hint_y=None,
+            height=dp(22)
+        ))
+
+        self.manual_input = MDTextField(
+            hint_text="AA:BB:CC:DD:EE:FF",
+            mode="rectangle",
+            size_hint_y=None,
+            height=dp(50)
+        )
+        self.manual_input.bind(text=self._on_manual_input)
+        device_card.add_widget(self.manual_input)
 
         content.add_widget(device_card)
 
@@ -206,12 +223,27 @@ class HomeScreen(MDScreen):
         # Expand list height to fit all devices
         self.device_list.height = dp(44) * len(devices)
 
+    def _on_manual_input(self, instance, value):
+        """Update selection when user types a MAC address manually."""
+        value = value.strip()
+        if value:
+            self.selected_device_address = value
+            self.selected_device_name = value
+            self.selected_label.text = f"Manual: {value}"
+            self.selected_label.theme_text_color = "Primary"
+        else:
+            self.selected_device_address = None
+            self.selected_device_name = None
+            self.selected_label.text = "No device selected"
+            self.selected_label.theme_text_color = "Secondary"
+
     def select_device(self, name, address):
-        """Store selected device and highlight the selection."""
+        """Store selected device from paired list and clear manual input."""
         self.selected_device_name = name
         self.selected_device_address = address
         self.selected_label.text = f"Selected: {name}"
         self.selected_label.theme_text_color = "Primary"
+        self.manual_input.text = ""  # clear manual field when picking from list
 
     def start_test(self, instance):
         """Validate selection and navigate to testing screen."""
