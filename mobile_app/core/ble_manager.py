@@ -1,12 +1,24 @@
 """
 Direct BLE communication for Android.
 Uses Android BluetoothGatt API via jnius (no dependency on external apps).
+GATT callbacks are handled by a pure-Java GattCallbackHelper (no PythonJavaClass)
+to avoid Android background-thread ClassLoader issues.
 """
 import os
 import time
 import threading
 
 IS_ANDROID = 'ANDROID_ARGUMENT' in os.environ or 'ANDROID_ROOT' in os.environ
+
+_DEBUG_FILE = '/data/data/com.wellysis.sdkautotester/files/ble_debug.txt'
+
+def _dbg(msg):
+    """Write a debug line to a file readable via adb shell run-as."""
+    try:
+        with open(_DEBUG_FILE, 'a') as f:
+            f.write(msg + '\n')
+    except Exception:
+        pass
 
 # ─── Standard Bluetooth SIG UUIDs ────────────────────────────────────────────
 BATTERY_SVC        = "0000180f-0000-1000-8000-00805f9b34fb"
@@ -42,61 +54,35 @@ if IS_ANDROID:
         from jnius import autoclass, PythonJavaClass, java_method
 
         _BluetoothAdapter = autoclass('android.bluetooth.BluetoothAdapter')
+        _BluetoothDevice  = autoclass('android.bluetooth.BluetoothDevice')
         _BluetoothGattCharacteristic = autoclass(
             'android.bluetooth.BluetoothGattCharacteristic')
-        _UUID = autoclass('java.util.UUID')
-        _PythonActivity = autoclass('org.kivy.android.PythonActivity')
+        # Pure-Java callback helper — no PythonJavaClass needed
+        _GattCallbackHelper = autoclass(
+            'com.wellysis.sdkautotester.GattCallbackHelper')
+        _UUID            = autoclass('java.util.UUID')
+        _PythonActivity  = autoclass('org.kivy.android.PythonActivity')
         HAS_BLE = True
     except Exception as _e:
         _BLE_INIT_ERROR = str(_e)
 
 
 if HAS_BLE:
-    class _GattCallback(PythonJavaClass):
-        """Java BluetoothGattCallback implementation."""
-        __javainterfaces__ = ['android/bluetooth/BluetoothGattCallback']
+    class _LeScanCallback(PythonJavaClass):
+        """Java BluetoothAdapter.LeScanCallback for BLE device discovery."""
+        __javainterfaces__ = ['android/bluetooth/BluetoothAdapter$LeScanCallback']
         __javacontext__ = 'app'
 
-        def __init__(self, manager):
+        def __init__(self, on_device):
             super().__init__()
-            self.mgr = manager
+            self._on_device = on_device
 
-        @java_method('(Landroid/bluetooth/BluetoothGatt;II)V')
-        def onConnectionStateChange(self, gatt, status, newState):
-            STATE_CONNECTED = 2
-            if newState == STATE_CONNECTED:
-                self.mgr._connected = True
-                gatt.discoverServices()
-            else:
-                self.mgr._connected = False
-                self.mgr._services_discovered = False
-
-        @java_method('(Landroid/bluetooth/BluetoothGatt;I)V')
-        def onServicesDiscovered(self, gatt, status):
-            if status == 0:  # GATT_SUCCESS
-                self.mgr._services_discovered = True
-
-        @java_method('(Landroid/bluetooth/BluetoothGatt;'
-                     'Landroid/bluetooth/BluetoothGattCharacteristic;I)V')
-        def onCharacteristicRead(self, gatt, characteristic, status):
-            if status == 0:
-                v = characteristic.getValue()
-                self.mgr._read_value = bytes(v) if v else b''
-            self.mgr._read_done.set()
-
-        @java_method('(Landroid/bluetooth/BluetoothGatt;'
-                     'Landroid/bluetooth/BluetoothGattCharacteristic;I)V')
-        def onCharacteristicWrite(self, gatt, characteristic, status):
-            self.mgr._write_ok = (status == 0)
-            self.mgr._write_done.set()
-
-        @java_method('(Landroid/bluetooth/BluetoothGatt;'
-                     'Landroid/bluetooth/BluetoothGattCharacteristic;)V')
-        def onCharacteristicChanged(self, gatt, characteristic):
-            v = characteristic.getValue()
-            data = bytes(v) if v else b''
-            if self.mgr._notify_cb:
-                self.mgr._notify_cb(data)
+        @java_method('(Landroid/bluetooth/BluetoothDevice;I[B)V')
+        def onLeScan(self, device, rssi, scanRecord):
+            name = device.getName() or ""
+            address = device.getAddress() or ""
+            if address:
+                self._on_device(name, address)
 
 
 class BLEManager:
@@ -104,17 +90,38 @@ class BLEManager:
 
     def __init__(self):
         self._gatt = None
-        self._cb = None
-        self._connected = False
-        self._services_discovered = False
-        self._read_value = None
-        self._read_done = threading.Event()
-        self._write_ok = False
-        self._write_done = threading.Event()
-        self._notify_cb = None
+        self._cb   = None      # GattCallbackHelper (Java) — stores all GATT state
+        self._scan_cb = None
         self._adapter = _BluetoothAdapter.getDefaultAdapter() if HAS_BLE else None
 
     # ── Device discovery ─────────────────────────────────────────────────────
+
+    def scan_for_device(self, serial_keyword, timeout=10):
+        """Scan for nearby BLE devices; return first (name, address) whose name
+        contains serial_keyword, or None. Does NOT require pre-pairing."""
+        if not HAS_BLE or not self._adapter:
+            return None
+        if not self._adapter.isEnabled():
+            raise RuntimeError("Bluetooth is not enabled")
+
+        found = threading.Event()
+        result = [None]
+
+        def on_device(name, address):
+            if serial_keyword.lower() in name.lower():
+                result[0] = (name, address)
+                found.set()
+
+        cb = _LeScanCallback(on_device)
+        self._scan_cb = cb
+        self._adapter.startLeScan(cb)
+        try:
+            found.wait(timeout=timeout)
+        finally:
+            self._adapter.stopLeScan(cb)
+            self._scan_cb = None
+
+        return result[0]
 
     def get_bonded_devices(self):
         """Return paired Bluetooth devices as list of (name, address) tuples."""
@@ -144,22 +151,31 @@ class BLEManager:
             raise RuntimeError("Bluetooth is not enabled")
 
         activity = _PythonActivity.mActivity
-        device = self._adapter.getRemoteDevice(address)
-        self._cb = _GattCallback(self)
-        self._connected = False
-        self._services_discovered = False
-        self._gatt = device.connectGatt(activity, False, self._cb)
+        device   = self._adapter.getRemoteDevice(address)
 
+        # GattCallbackHelper extends BluetoothGattCallback directly in Java —
+        # no PythonJavaClass / no classloader issues.
+        self._cb = _GattCallbackHelper()
+
+        _dbg(f"connectGatt → {address}")
+        self._gatt = device.connectGatt(
+            activity, False, self._cb, _BluetoothDevice.TRANSPORT_LE)
+        _dbg(f"connectGatt returned: {self._gatt}")
+
+        # Wait for connection (state == 2 = STATE_CONNECTED)
         deadline = time.time() + timeout
-        while not self._connected and time.time() < deadline:
+        while self._cb.getConnectionState() != 2 and time.time() < deadline:
             time.sleep(0.1)
-        if not self._connected:
+        _dbg(f"connectionState after wait: {self._cb.getConnectionState()}")
+        if self._cb.getConnectionState() != 2:
             raise RuntimeError(f"Connection timeout ({address})")
 
+        # Wait for service discovery
         deadline = time.time() + timeout
-        while not self._services_discovered and time.time() < deadline:
+        while not self._cb.isServicesDiscovered() and time.time() < deadline:
             time.sleep(0.1)
-        if not self._services_discovered:
+        _dbg(f"servicesDiscovered: {self._cb.isServicesDiscovered()}")
+        if not self._cb.isServicesDiscovered():
             raise RuntimeError("Service discovery timeout")
 
     def disconnect(self):
@@ -168,12 +184,13 @@ class BLEManager:
             self._gatt.disconnect()
             self._gatt.close()
             self._gatt = None
-        self._connected = False
-        self._services_discovered = False
+        self._cb = None
 
     @property
     def is_connected(self):
-        return self._connected and self._gatt is not None
+        return (self._gatt is not None and
+                self._cb is not None and
+                self._cb.getConnectionState() == 2)
 
     # ── GATT read ────────────────────────────────────────────────────────────
 
@@ -187,17 +204,22 @@ class BLEManager:
         ch = svc.getCharacteristic(_UUID.fromString(char_uuid))
         if not ch:
             raise RuntimeError(f"Characteristic not found: {char_uuid}")
-        self._read_done.clear()
-        self._read_value = None
+
+        self._cb.clearRead()
         self._gatt.readCharacteristic(ch)
-        if not self._read_done.wait(timeout):
+
+        deadline = time.time() + timeout
+        while not self._cb.isReadDone() and time.time() < deadline:
+            time.sleep(0.05)
+        if not self._cb.isReadDone():
             raise RuntimeError("Read timeout")
-        return self._read_value
+
+        raw = self._cb.getReadValue()
+        return bytes(raw) if raw else b''
 
     def read_string(self, svc_uuid, char_uuid, timeout=5):
         """Read a characteristic and decode as UTF-8 string."""
-        raw = self.read(svc_uuid, char_uuid, timeout)
-        return self._decode_str(raw)
+        return self._decode_str(self.read(svc_uuid, char_uuid, timeout))
 
     def read_uint8(self, svc_uuid, char_uuid, timeout=5):
         """Read a single-byte integer characteristic."""
@@ -216,32 +238,43 @@ class BLEManager:
         ch = svc.getCharacteristic(_UUID.fromString(char_uuid))
         if not ch:
             raise RuntimeError(f"Characteristic not found: {char_uuid}")
+
         ch.setValue(list(value))
-        self._write_done.clear()
+        self._cb.clearWrite()
         self._gatt.writeCharacteristic(ch)
-        if not self._write_done.wait(timeout):
+
+        deadline = time.time() + timeout
+        while not self._cb.isWriteDone() and time.time() < deadline:
+            time.sleep(0.05)
+        if not self._cb.isWriteDone():
             raise RuntimeError("Write timeout")
-        if not self._write_ok:
+        if not self._cb.isWriteOk():
             raise RuntimeError("Write failed (GATT error)")
 
     # ── Notifications ────────────────────────────────────────────────────────
 
-    def enable_notify(self, svc_uuid, char_uuid, callback):
-        """Enable BLE notifications. callback(data: bytes) is called on each packet."""
+    def enable_notify(self, svc_uuid, char_uuid, callback=None):
+        """Enable BLE notifications. callback is ignored (use read_notify to poll)."""
         if not self.is_connected:
             raise RuntimeError("Not connected")
         svc = self._gatt.getService(_UUID.fromString(svc_uuid))
-        ch = svc.getCharacteristic(_UUID.fromString(char_uuid))
+        ch  = svc.getCharacteristic(_UUID.fromString(char_uuid))
         self._gatt.setCharacteristicNotification(ch, True)
-        self._notify_cb = callback
+        self._cb.clearNotify()
 
-        # Write CCC descriptor to enable server-side notifications
         CCCD = "00002902-0000-1000-8000-00805f9b34fb"
         desc = ch.getDescriptor(_UUID.fromString(CCCD))
         if desc:
             desc.setValue([0x01, 0x00])
             self._gatt.writeDescriptor(desc)
         time.sleep(0.2)
+
+    def read_notify(self, timeout=5):
+        """Block up to timeout seconds for the next notification packet."""
+        if not self.is_connected:
+            raise RuntimeError("Not connected")
+        raw = self._cb.pollNotify(int(timeout * 1000))
+        return bytes(raw) if raw else b''
 
     def disable_notify(self, svc_uuid, char_uuid):
         """Disable BLE notifications."""
@@ -252,7 +285,6 @@ class BLEManager:
             ch = svc.getCharacteristic(_UUID.fromString(char_uuid))
             if ch:
                 self._gatt.setCharacteristicNotification(ch, False)
-        self._notify_cb = None
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 

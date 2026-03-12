@@ -16,6 +16,7 @@ from kivymd.uix.progressbar import MDProgressBar
 from kivymd.uix.toolbar import MDTopAppBar
 from kivymd.uix.list import OneLineAvatarIconListItem, IconLeftWidget
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.image import Image as KivyImage
 from kivy.clock import Clock
 from kivy.metrics import dp
 from kivy.properties import StringProperty, NumericProperty
@@ -25,7 +26,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from core.test_runner import TestRunner
-from core.ble_manager import BLEManager
+from core.ble_manager import BLEManager, IS_ANDROID
 
 
 class HomeScreen(MDScreen):
@@ -40,7 +41,7 @@ class HomeScreen(MDScreen):
         layout = MDBoxLayout(orientation='vertical', padding=dp(10), spacing=dp(10))
 
         toolbar = MDTopAppBar(
-            title="SDK Auto Tester",
+            title="S-patch SDK",
             elevation=3,
             md_bg_color=(0.2, 0.6, 1, 1)
         )
@@ -49,6 +50,22 @@ class HomeScreen(MDScreen):
         scroll = ScrollView()
         content = MDBoxLayout(orientation='vertical', padding=dp(15), spacing=dp(15), size_hint_y=None)
         content.bind(minimum_height=content.setter('height'))
+
+        # ── Product image header ──────────────────────────────────────────────
+        img_card = MDCard(
+            size_hint=(1, None),
+            height=dp(150),
+            md_bg_color=(0, 0, 0, 1),
+            elevation=0,
+            radius=[dp(8), dp(8), dp(8), dp(8)]
+        )
+        product_img = KivyImage(
+            source='spatch_logo.png',
+            size_hint=(1, 1),
+            fit_mode='contain'
+        )
+        img_card.add_widget(product_img)
+        content.add_widget(img_card)
 
         # ── BLE Device selection card ─────────────────────────────────────────
         device_card = MDCard(
@@ -96,7 +113,7 @@ class HomeScreen(MDScreen):
 
         # ── Serial number search ──────────────────────────────────────────────
         device_card.add_widget(MDLabel(
-            text="Or enter device serial number:",
+            text="Or enter serial number to scan & connect:",
             theme_text_color="Secondary",
             size_hint_y=None,
             height=dp(22)
@@ -243,32 +260,51 @@ class HomeScreen(MDScreen):
         self.device_list.height = dp(44) * len(devices)
 
     def find_by_serial(self):
-        """Search paired BLE devices for one whose name contains the serial number."""
+        """Scan for nearby BLE devices and select the one matching the serial number.
+        No pre-pairing required — the app scans and initiates connection directly.
+        """
         serial = self.serial_input.text.strip()
         if not serial:
             self.selected_label.text = "Enter a serial number first."
             self.selected_label.theme_text_color = "Error"
             return
 
-        try:
-            ble = BLEManager()
-            devices = ble.get_bonded_devices()
-        except Exception:
-            devices = []
+        if getattr(self, '_scanning', False):
+            return  # prevent concurrent scans
 
-        # Match: serial number appears anywhere in the device name
-        for name, address in devices:
-            if serial.lower() in name.lower():
-                self.selected_device_name = name
-                self.selected_device_address = address
-                self.selected_label.text = f"Found: {name}"
-                self.selected_label.theme_text_color = "Primary"
-                return
+        self._scanning = True
+        self.selected_label.text = f"Scanning for '{serial}'..."
+        self.selected_label.theme_text_color = "Secondary"
 
-        # Not found in paired devices
-        self.selected_device_address = None
-        self.selected_label.text = f"'{serial}' not found. Pair the device in BT settings first."
-        self.selected_label.theme_text_color = "Error"
+        def do_scan():
+            result = None
+            err = None
+            try:
+                ble = BLEManager()
+                result = ble.scan_for_device(serial, timeout=10)
+            except Exception as e:
+                err = str(e)
+            Clock.schedule_once(lambda _dt: self._on_scan_done(serial, result, err), 0)
+
+        threading.Thread(target=do_scan, daemon=True).start()
+
+    def _on_scan_done(self, serial, result, error):
+        """Called on the main thread when BLE scan finishes."""
+        self._scanning = False
+        if error:
+            self.selected_device_address = None
+            self.selected_label.text = f"Scan error: {error}"
+            self.selected_label.theme_text_color = "Error"
+        elif result:
+            name, address = result
+            self.selected_device_name = name
+            self.selected_device_address = address
+            self.selected_label.text = f"Found: {name}"
+            self.selected_label.theme_text_color = "Primary"
+        else:
+            self.selected_device_address = None
+            self.selected_label.text = f"'{serial}' not found nearby. Is the device powered on?"
+            self.selected_label.theme_text_color = "Error"
 
     def select_device(self, name, address):
         """Store selected device from paired list and clear serial input."""
@@ -640,6 +676,19 @@ class SDKAutoTesterApp(MDApp):
         sm.add_widget(TestingScreen())
         sm.add_widget(ResultScreen())
         return sm
+
+    def on_start(self):
+        """Request Bluetooth runtime permissions on Android 12+ at app start."""
+        if IS_ANDROID:
+            try:
+                from android.permissions import request_permissions, Permission
+                request_permissions([
+                    Permission.BLUETOOTH_SCAN,
+                    Permission.BLUETOOTH_CONNECT,
+                    Permission.ACCESS_FINE_LOCATION,
+                ])
+            except Exception:
+                pass
 
 
 if __name__ == '__main__':

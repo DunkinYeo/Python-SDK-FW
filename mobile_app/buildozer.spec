@@ -1,13 +1,19 @@
 [app]
 
 # App title
-title = SDK Auto Tester
+title = S-patch SDK Auto test
 
 # Package name
 package.name = sdkautotester
 
 # Package domain
 package.domain = com.wellysis
+
+# App icon
+android.icon.filename = %(source.dir)s/icon.png
+
+# Custom Java source files (GattCallbackWrapper — extends abstract BluetoothGattCallback)
+android.add_src = java
 
 # Source directory
 source.dir = .

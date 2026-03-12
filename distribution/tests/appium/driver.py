@@ -36,4 +36,6 @@ def get_driver():
     options.full_reset = False
 
     server_url = os.getenv('APPIUM_SERVER_URL', 'http://localhost:4723/wd/hub')
-    return webdriver.Remote(server_url, options=options)
+    driver = webdriver.Remote(server_url, options=options)
+    driver.implicitly_wait(10)
+    return driver

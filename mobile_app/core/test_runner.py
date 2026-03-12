@@ -6,6 +6,7 @@ No dependency on any external SDK sample app.
 
 import time
 import threading
+import traceback
 import os
 
 IS_ANDROID = 'ANDROID_ARGUMENT' in os.environ or 'ANDROID_ROOT' in os.environ
@@ -107,6 +108,12 @@ class TestRunner:
                 progress += step
 
         except Exception as e:
+            tb = traceback.format_exc()
+            try:
+                with open('/data/data/com.wellysis.sdkautotester/files/ble_debug.txt', 'a') as f:
+                    f.write(f"[TEST ERROR]\n{tb}\n")
+            except Exception:
+                pass
             self.result['error'] = str(e)
             self._update('Error', 90, f'[ERROR] {e}')
 
@@ -209,18 +216,15 @@ class TestRunner:
                 'Replace TODO placeholders in ble_manager.py.')
             return
 
-        packets = []
-        done = threading.Event()
-
-        def on_data(data):
-            packets.append(data)
-            if len(packets) >= 5:
-                done.set()
-
         key = 'Notify - ECG'
         try:
-            self.ble.enable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY, on_data)
-            done.wait(timeout=10)
+            self.ble.enable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY)
+            packets = []
+            deadline = time.time() + 10
+            while len(packets) < 5 and time.time() < deadline:
+                data = self.ble.read_notify(timeout=2)
+                if data:
+                    packets.append(data)
             self.ble.disable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY)
 
             if packets:
@@ -247,21 +251,18 @@ class TestRunner:
                 'Replace TODO placeholders in ble_manager.py.')
             return
 
-        packets = []
-        done = threading.Event()
-
-        def on_data(data):
-            packets.append(data)
-            if len(packets) % 10 == 0 or len(packets) >= target:
-                self._update('', -1, f'  Packets: {len(packets)}/{target}')
-            if len(packets) >= target:
-                done.set()
-
         key = 'Packet Monitoring'
         try:
-            self.ble.enable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY, on_data)
+            self.ble.enable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY)
+            packets = []
             timeout = target * 2 + 30
-            done.wait(timeout=timeout)
+            deadline = time.time() + timeout
+            while len(packets) < target and time.time() < deadline and not self.cancelled:
+                data = self.ble.read_notify(timeout=2)
+                if data:
+                    packets.append(data)
+                    if len(packets) % 10 == 0:
+                        self._update('', -1, f'  Packets: {len(packets)}/{target}')
             self.ble.disable_notify(WELLYSIS_SVC, WELLYSIS_ECG_NOTIFY)
 
             if len(packets) >= target:
