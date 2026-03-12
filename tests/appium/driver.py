@@ -35,6 +35,9 @@ def get_driver():
     options.no_reset = True
     options.full_reset = False
 
+    # Keep session alive for long-running tests (2 hours)
+    options.new_command_timeout = 7200
+
     server_url = os.getenv('APPIUM_SERVER_URL', 'http://localhost:4723')
     driver = webdriver.Remote(server_url, options=options)
     driver.implicitly_wait(10)

@@ -5,6 +5,7 @@ import os
 import subprocess
 from dotenv import load_dotenv
 from appium.webdriver.common.appiumby import AppiumBy
+from selenium.common.exceptions import InvalidSessionIdException
 import re
 
 load_dotenv()
@@ -235,6 +236,11 @@ class TestDataCollectionWorkflow:
                             if not packet_text:
                                 raise Exception("Packet Number not found")
                         except Exception as e2:
+                            # Session terminated — exit immediately, no point retrying
+                            if isinstance(e1, InvalidSessionIdException) or isinstance(e2, InvalidSessionIdException):
+                                print("\n❌ Appium session terminated — stopping packet monitoring")
+                                consecutive_failures = max_failures  # force exit
+                                break
                             print(f"❌ [DEBUG] XPath failed: {str(e1)[:60]}")
                             consecutive_failures += 1
                             if consecutive_failures % 3 == 0:
@@ -278,6 +284,9 @@ class TestDataCollectionWorkflow:
 
                     time.sleep(check_interval)
 
+                except InvalidSessionIdException:
+                    print("\n❌ Appium session terminated — stopping packet monitoring")
+                    break
                 except Exception as e:
                     print(f"⚠️  Error: {e}")
                     consecutive_failures += 1
@@ -287,7 +296,10 @@ class TestDataCollectionWorkflow:
                     _keepalive()
                     time.sleep(check_interval)
 
-            driver.save_screenshot('step4_notify_target_reached.png')
+            try:
+                driver.save_screenshot('step4_notify_target_reached.png')
+            except Exception:
+                pass
             print("✅ Packet monitoring complete!")
         else:
             print("⏳ Observing data for 10 seconds...")
