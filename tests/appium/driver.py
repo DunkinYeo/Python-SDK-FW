@@ -7,7 +7,7 @@ def get_driver():
     """Return an Appium webdriver.Remote instance using environment-configured capabilities.
 
     Environment variables:
-      - APPIUM_SERVER_URL (default: http://localhost:4723/wd/hub)
+      - APPIUM_SERVER_URL (default: http://localhost:4723)
       - APPIUM_PLATFORM_NAME (default: Android)
       - APPIUM_DEVICE_NAME (default: Android Emulator)
       - APPIUM_APP_PATH (path to app under test)
@@ -35,7 +35,7 @@ def get_driver():
     options.no_reset = True
     options.full_reset = False
 
-    server_url = os.getenv('APPIUM_SERVER_URL', 'http://localhost:4723/wd/hub')
+    server_url = os.getenv('APPIUM_SERVER_URL', 'http://localhost:4723')
     driver = webdriver.Remote(server_url, options=options)
     driver.implicitly_wait(10)
     return driver
